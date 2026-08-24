@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import {
+  Coffee,
   Gauge,
   Gamepad2,
   Map as MapIcon,
@@ -44,6 +45,19 @@ function Overlay({ children, className }: { children: ReactNode; className?: str
   );
 }
 
+const COFFEE_URL = "https://buymeacoffee.com/wilsonsamiano";
+
+function CoffeeLink({ className }: { className?: string }) {
+  return (
+    <Button variant="ghost" className={cn("w-full", className)} asChild>
+      <a href={COFFEE_URL} target="_blank" rel="noopener noreferrer">
+        <Coffee className="size-4" />
+        Buy me a coffee
+      </a>
+    </Button>
+  );
+}
+
 export function TitleScreen() {
   const api = useGame((s) => s.api);
   return (
@@ -69,6 +83,7 @@ export function TitleScreen() {
               Records
             </Button>
           </div>
+          <CoffeeLink />
         </div>
       </Panel>
     </Overlay>
@@ -104,7 +119,8 @@ export function HelpScreen() {
             Pickups: multi-shot, shield, speed, repair.
           </li>
         </ul>
-        <Button className="mt-6 w-full" variant="ghost" onClick={() => api?.toTitle()}>
+        <CoffeeLink className="mt-6" />
+        <Button className="mt-3 w-full" variant="ghost" onClick={() => api?.toTitle()}>
           Close
         </Button>
       </Panel>

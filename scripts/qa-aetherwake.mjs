@@ -13,6 +13,14 @@ page.on("console", (m) => {
 page.on("pageerror", (e) => errors.push(e.message));
 
 await page.goto("http://127.0.0.1:8080/", { waitUntil: "networkidle" });
+const coffee = page.getByRole("link", { name: "Buy me a coffee" });
+const coffeeHref = await coffee.getAttribute("href");
+const coffeeTarget = await coffee.getAttribute("target");
+console.log("coffee-link", coffeeHref, coffeeTarget);
+if (coffeeHref !== "https://buymeacoffee.com/wilsonsamiano" || coffeeTarget !== "_blank") {
+  console.log("FAIL coffee link missing or wrong");
+  process.exitCode = 1;
+}
 await page.getByRole("button", { name: "Engage", exact: true }).click();
 await page.waitForTimeout(500);
 const hud1 = await page.evaluate(() => document.body.innerText);
