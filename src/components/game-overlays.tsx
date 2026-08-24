@@ -61,16 +61,25 @@ function CoffeeLink({ className }: { className?: string }) {
 export function TitleScreen() {
   const api = useGame((s) => s.api);
   return (
-    <Overlay>
-      <Panel className="text-center">
-        <p className="font-display text-xs font-medium uppercase tracking-[0.28em] text-accent">Deep void protocol</p>
-        <h1 className="mt-3 font-display text-4xl font-semibold tracking-[-0.04em] text-fg sm:text-5xl">
-          Aetherwake
-        </h1>
-        <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted">
-          Twin-stick void combat. WASD or the left well strafes. Mouse, right stick, or the right well aims. The hull yaws onto the reticle — shots leave the nose. Clear a wave, spend forge in the bay, then Engage the next threat.
-        </p>
-        <div className="mt-6 flex flex-col gap-3">
+    <div className="absolute inset-0 z-20 flex flex-col justify-end p-4 pb-[max(5.5rem,env(safe-area-inset-bottom))] sm:pb-6">
+      <img
+        src="/title.jpg"
+        alt=""
+        width={1200}
+        height={630}
+        draggable={false}
+        decoding="async"
+        fetchPriority="high"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center select-none"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent"
+        aria-hidden
+      />
+      <h1 className="sr-only">Aetherwake</h1>
+      <p className="sr-only">Forge the ship. Wake the void.</p>
+      <div className="pointer-events-auto relative mx-auto w-[min(440px,calc(100vw-2rem))] rounded-xl border border-border bg-surface/80 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+        <div className="flex flex-col gap-3">
           <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
             <Play className="size-4" />
             Engage
@@ -85,8 +94,8 @@ export function TitleScreen() {
           </div>
           <CoffeeLink />
         </div>
-      </Panel>
-    </Overlay>
+      </div>
+    </div>
   );
 }
 
