@@ -1,12 +1,12 @@
 import { i as __toESM } from "../_runtime.mjs";
 import { n as require_react } from "../_libs/@radix-ui/react-compose-refs+[...].mjs";
 import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
-import { c as Pause, d as Gamepad2, i as Volume2, l as Map, n as X, o as Shield, r as VolumeX, s as Play, t as Zap, u as Gauge } from "../_libs/lucide-react.mjs";
+import { c as Pause, d as Gamepad2, f as ChevronsUp, i as Volume2, l as Map, n as X, o as Shield, r as VolumeX, s as Play, t as Zap, u as Gauge } from "../_libs/lucide-react.mjs";
 import { t as create } from "../_libs/zustand.mjs";
 import { n as clsx, t as cva } from "../_libs/class-variance-authority+clsx.mjs";
 import { t as Slot } from "../_libs/radix-ui__react-slot.mjs";
 import { t as twMerge } from "../_libs/tailwind-merge.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-CwyYnroC.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-DG1BkatD.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var bus = null;
@@ -126,6 +126,10 @@ var GAME_KEYS = /* @__PURE__ */ new Set([
 	"KeyA",
 	"KeyS",
 	"KeyD",
+	"KeyI",
+	"KeyJ",
+	"KeyK",
+	"KeyL",
 	"ArrowUp",
 	"ArrowDown",
 	"ArrowLeft",
@@ -134,8 +138,12 @@ var GAME_KEYS = /* @__PURE__ */ new Set([
 	"ShiftLeft",
 	"ShiftRight",
 	"KeyP",
+	"KeyF",
+	"KeyM",
 	"Escape",
-	"Enter"
+	"Enter",
+	"Tab",
+	"Backspace"
 ]);
 function radial(x, y, dz = .18) {
 	const m = Math.hypot(x, y);
@@ -150,6 +158,11 @@ function radial(x, y, dz = .18) {
 		y: y * scale,
 		m
 	};
+}
+function digit(v, dz = .55) {
+	if (v < -dz) return -1;
+	if (v > dz) return 1;
+	return 0;
 }
 var Input = class {
 	keys = /* @__PURE__ */ new Set();
@@ -175,12 +188,26 @@ var Input = class {
 	pauseQueued = false;
 	dashQueued = false;
 	confirmQueued = false;
+	backQueued = false;
+	skillsQueued = false;
+	muteQueued = false;
 	prevPause = false;
 	prevDash = false;
 	prevConfirm = false;
+	prevBack = false;
+	prevSkills = false;
+	prevMute = false;
 	prevPadPause = false;
 	prevPadDash = false;
 	prevPadConfirm = false;
+	prevPadBack = false;
+	prevPadSkills = false;
+	menuHold = {
+		x: 0,
+		y: 0,
+		tx: 0,
+		ty: 0
+	};
 	onPad;
 	attach(canvas) {
 		this.canvas = canvas;
@@ -218,13 +245,16 @@ var Input = class {
 		};
 		if (active) this.aimSource = "touch";
 	}
+	queueDash() {
+		this.dashQueued = true;
+	}
 	setKeys(codes) {
 		this.injected = new Set(codes);
 	}
 	/** Drop mouse aim so a menu click doesn't yank the nose. */
 	clearPointerAim() {
 		this.pointer.moved = false;
-		this.aimSource = "none";
+		if (this.aimSource === "pointer") this.aimSource = "none";
 	}
 	clientToWorld(clientX, clientY) {
 		const c = this.canvas;
@@ -245,10 +275,10 @@ var Input = class {
 		const keys = /* @__PURE__ */ new Set([...this.keys, ...this.injected]);
 		let mx = 0;
 		let my = 0;
-		if (keys.has("KeyA") || keys.has("ArrowLeft")) mx -= 1;
-		if (keys.has("KeyD") || keys.has("ArrowRight")) mx += 1;
-		if (keys.has("KeyW") || keys.has("ArrowUp")) my -= 1;
-		if (keys.has("KeyS") || keys.has("ArrowDown")) my += 1;
+		if (keys.has("KeyA")) mx -= 1;
+		if (keys.has("KeyD")) mx += 1;
+		if (keys.has("KeyW")) my -= 1;
+		if (keys.has("KeyS")) my += 1;
 		const pad = this.readPad();
 		mx += pad.mx;
 		my += pad.my;
@@ -261,6 +291,13 @@ var Input = class {
 			mx /= mlen;
 			my /= mlen;
 		}
+		let kax = 0;
+		let kay = 0;
+		if (keys.has("ArrowLeft") || keys.has("KeyJ")) kax -= 1;
+		if (keys.has("ArrowRight") || keys.has("KeyL")) kax += 1;
+		if (keys.has("ArrowUp") || keys.has("KeyI")) kay -= 1;
+		if (keys.has("ArrowDown") || keys.has("KeyK")) kay += 1;
+		const kAim = Math.hypot(kax, kay);
 		let aimSX = 0;
 		let aimSY = 0;
 		if (this.touchAim.active) {
@@ -271,6 +308,10 @@ var Input = class {
 			aimSX = pad.ax;
 			aimSY = pad.ay;
 			this.aimSource = "pad";
+		} else if (kAim > 0) {
+			aimSX = kax / kAim;
+			aimSY = kay / kAim;
+			this.aimSource = "keys";
 		}
 		if (pad.connected) this.padLive = true;
 		else if (!pad.connected && this.aimSource === "pad") this.aimSource = "none";
@@ -293,6 +334,30 @@ var Input = class {
 		this.prevConfirm = confirmHeld;
 		this.prevPadConfirm = pad.confirm;
 		this.confirmQueued = false;
+		const backHeld = keys.has("Backspace") || this.backQueued;
+		const backEdge = backHeld && !this.prevBack || pad.back && !this.prevPadBack || this.backQueued;
+		this.prevBack = backHeld;
+		this.prevPadBack = pad.back;
+		this.backQueued = false;
+		const skillsHeld = keys.has("KeyF") || this.skillsQueued;
+		const skillsEdge = skillsHeld && !this.prevSkills || pad.skills && !this.prevPadSkills || this.skillsQueued;
+		this.prevSkills = skillsHeld;
+		this.prevPadSkills = pad.skills;
+		this.skillsQueued = false;
+		const muteHeld = keys.has("KeyM") || this.muteQueued;
+		const muteEdge = muteHeld && !this.prevMute;
+		this.prevMute = muteHeld;
+		this.muteQueued = false;
+		let navX = digit(pad.mx, .55);
+		let navY = digit(pad.my, .55);
+		if (keys.has("ArrowLeft") || keys.has("KeyA") || keys.has("KeyJ")) navX -= 1;
+		if (keys.has("ArrowRight") || keys.has("KeyD") || keys.has("KeyL")) navX += 1;
+		if (keys.has("ArrowUp") || keys.has("KeyW") || keys.has("KeyI")) navY -= 1;
+		if (keys.has("ArrowDown") || keys.has("KeyS") || keys.has("KeyK")) navY += 1;
+		if (keys.has("Tab")) navY += eShiftTab(keys) ? -1 : 1;
+		navX = navX < 0 ? -1 : navX > 0 ? 1 : 0;
+		navY = navY < 0 ? -1 : navY > 0 ? 1 : 0;
+		const { dx: menuDX, dy: menuDY } = this.menuRepeat(navX, navY);
 		return {
 			moveX: mx,
 			moveY: my,
@@ -306,7 +371,12 @@ var Input = class {
 			fire,
 			dash: dashEdge,
 			pause: pauseEdge,
-			confirm: confirmEdge
+			confirm: confirmEdge,
+			back: backEdge,
+			skills: skillsEdge,
+			mute: muteEdge,
+			menuDX,
+			menuDY
 		};
 	}
 	rumble(strong = .4, weak = .6, ms = 80) {
@@ -322,6 +392,31 @@ var Input = class {
 			}).catch(() => {});
 		}
 	}
+	menuRepeat(nx, ny) {
+		const now = performance.now();
+		let dx = 0;
+		let dy = 0;
+		if (nx !== this.menuHold.x) {
+			this.menuHold.x = nx;
+			this.menuHold.tx = now;
+			dx = nx;
+		} else if (nx !== 0 && now - this.menuHold.tx > 320) {
+			this.menuHold.tx = now - 170;
+			dx = nx;
+		}
+		if (ny !== this.menuHold.y) {
+			this.menuHold.y = ny;
+			this.menuHold.ty = now;
+			dy = ny;
+		} else if (ny !== 0 && now - this.menuHold.ty > 320) {
+			this.menuHold.ty = now - 170;
+			dy = ny;
+		}
+		return {
+			dx,
+			dy
+		};
+	}
 	readPad() {
 		const empty = {
 			mx: 0,
@@ -333,6 +428,8 @@ var Input = class {
 			dash: false,
 			pause: false,
 			confirm: false,
+			back: false,
+			skills: false,
 			active: false,
 			connected: false
 		};
@@ -354,11 +451,13 @@ var Input = class {
 		if (b(15)) mx += 1;
 		if (b(12)) my -= 1;
 		if (b(13)) my += 1;
-		const fire = b(7) || b(0) || v(7) > .35 || r.m > .25;
+		const fire = b(7) || v(7) > .35 || r.m > .25;
 		const dash = b(4) || b(5) || b(6) || v(6) > .6;
-		const pause = b(9) || b(8);
+		const pause = b(9);
 		const confirm = b(0);
-		const active = l.m > 0 || r.m > 0 || fire || dash || pause || confirm || b(12) || b(13) || b(14) || b(15);
+		const back = b(1);
+		const skills = b(3) || b(8);
+		const active = l.m > 0 || r.m > 0 || fire || dash || pause || confirm || back || skills || b(12) || b(13) || b(14) || b(15);
 		return {
 			mx,
 			my,
@@ -369,16 +468,23 @@ var Input = class {
 			dash,
 			pause,
 			confirm,
+			back,
+			skills,
 			active,
 			connected: true
 		};
 	}
 	onKeyDown = (e) => {
+		const tag = e.target?.tagName;
+		if (tag === "INPUT" || tag === "TEXTAREA") return;
 		if (GAME_KEYS.has(e.code)) e.preventDefault();
 		this.keys.add(e.code);
 		if (e.code === "Escape" || e.code === "KeyP") this.pauseQueued = true;
 		if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "Space") this.dashQueued = true;
 		if (e.code === "Enter") this.confirmQueued = true;
+		if (e.code === "Backspace") this.backQueued = true;
+		if (e.code === "KeyF") this.skillsQueued = true;
+		if (e.code === "KeyM") this.muteQueued = true;
 	};
 	onKeyUp = (e) => {
 		this.keys.delete(e.code);
@@ -407,28 +513,34 @@ var Input = class {
 		this.onPad?.(false);
 	};
 };
+function eShiftTab(keys) {
+	return keys.has("ShiftLeft") || keys.has("ShiftRight");
+}
 var SKILLS = [
 	{
 		id: "core",
 		name: "Wake Core",
+		short: "CORE",
 		desc: "The ship’s living heart. Already online.",
 		cost: 0,
 		x: .5,
-		y: .5,
+		y: .48,
 		requires: []
 	},
 	{
 		id: "hull1",
 		name: "Plated Hull",
+		short: "HULL",
 		desc: "+2 maximum hull.",
 		cost: 1,
 		x: .5,
-		y: .28,
+		y: .3,
 		requires: ["core"]
 	},
 	{
 		id: "hull2",
 		name: "Bulkheads",
+		short: "BULK",
 		desc: "+2 maximum hull.",
 		cost: 2,
 		x: .5,
@@ -438,118 +550,131 @@ var SKILLS = [
 	{
 		id: "regen",
 		name: "Nanite Weave",
+		short: "NANO",
 		desc: "Slow hull regeneration in combat.",
 		cost: 2,
-		x: .64,
+		x: .62,
 		y: .14,
 		requires: ["hull2"]
 	},
 	{
 		id: "cannon1",
 		name: "Rapid Coil",
+		short: "COIL",
 		desc: "Fire 25% faster.",
 		cost: 1,
-		x: .68,
-		y: .5,
+		x: .66,
+		y: .48,
 		requires: ["core"]
 	},
 	{
 		id: "cannon2",
 		name: "Hot Cores",
+		short: "HOT",
 		desc: "Shots deal 40% more damage.",
 		cost: 2,
-		x: .82,
-		y: .5,
+		x: .8,
+		y: .48,
 		requires: ["cannon1"]
 	},
 	{
 		id: "spread",
 		name: "Tri-Vane",
+		short: "TRI",
 		desc: "Permanent extra side shots.",
 		cost: 3,
-		x: .94,
-		y: .36,
+		x: .9,
+		y: .32,
 		requires: ["cannon2"]
 	},
 	{
 		id: "pierce",
 		name: "Phase Tips",
+		short: "PHASE",
 		desc: "Shots pierce one extra target.",
 		cost: 2,
-		x: .82,
-		y: .68,
+		x: .8,
+		y: .66,
 		requires: ["cannon2"]
 	},
 	{
 		id: "homing",
 		name: "Seek Lattice",
+		short: "SEEK",
 		desc: "Shots gently curve toward foes.",
 		cost: 3,
-		x: .94,
-		y: .68,
+		x: .9,
+		y: .66,
 		requires: ["pierce"]
 	},
 	{
 		id: "drive1",
 		name: "Afterburn",
+		short: "BURN",
 		desc: "+18% engine speed.",
 		cost: 1,
-		x: .32,
-		y: .5,
+		x: .34,
+		y: .48,
 		requires: ["core"]
 	},
 	{
 		id: "drive2",
 		name: "Slipstream",
+		short: "SLIP",
 		desc: "+18% engine speed.",
 		cost: 2,
-		x: .18,
-		y: .5,
+		x: .2,
+		y: .48,
 		requires: ["drive1"]
 	},
 	{
 		id: "dash",
 		name: "Blink Drive",
+		short: "BLINK",
 		desc: "Shift / dash to burst forward.",
 		cost: 2,
-		x: .18,
-		y: .68,
+		x: .2,
+		y: .66,
 		requires: ["drive2"]
 	},
 	{
 		id: "overcharge",
 		name: "Overcharge",
+		short: "OVER",
 		desc: "Fire rate and damage both climb.",
 		cost: 3,
-		x: .08,
-		y: .36,
+		x: .1,
+		y: .32,
 		requires: ["drive2"]
 	},
 	{
 		id: "shield1",
 		name: "Aegis Ring",
+		short: "AEGIS",
 		desc: "Start each life with a shield.",
 		cost: 1,
 		x: .5,
-		y: .7,
+		y: .66,
 		requires: ["core"]
 	},
 	{
 		id: "shield2",
 		name: "Double Aegis",
+		short: "DBL",
 		desc: "Larger shield capacity.",
 		cost: 2,
-		x: .36,
-		y: .86,
+		x: .38,
+		y: .84,
 		requires: ["shield1"]
 	},
 	{
 		id: "magnet",
 		name: "Salvage Well",
+		short: "WELL",
 		desc: "Pull pickups from farther away.",
 		cost: 2,
-		x: .64,
-		y: .86,
+		x: .62,
+		y: .84,
 		requires: ["shield1"]
 	}
 ];
@@ -699,7 +824,15 @@ var EMPTY_HUD = {
 	banner: "",
 	dashCd: 0,
 	unspent: 0,
-	padOn: false
+	padOn: false,
+	canDash: false
+};
+var EMPTY_BRIEF = {
+	cleared: 0,
+	next: 1,
+	title: "",
+	blurb: "",
+	threat: ""
 };
 var useGame = create((set) => ({
 	phase: "title",
@@ -711,7 +844,13 @@ var useGame = create((set) => ({
 	lastWave: 0,
 	owned: ["core"],
 	api: null,
-	setPhase: (phase) => set({ phase }),
+	menuIndex: 0,
+	skillId: "core",
+	briefing: EMPTY_BRIEF,
+	setPhase: (phase) => set({
+		phase,
+		menuIndex: 0
+	}),
 	setHud: (hud) => set({ hud }),
 	setApi: (api) => set({ api }),
 	setScores: (scores) => set({ scores }),
@@ -721,13 +860,154 @@ var useGame = create((set) => ({
 		qualify,
 		lastScore,
 		lastWave
-	})
+	}),
+	setMenuIndex: (menuIndex) => set({ menuIndex }),
+	setSkillId: (skillId) => set({ skillId }),
+	setBriefing: (briefing) => set({ briefing })
 }));
+function n(kind, count) {
+	return {
+		kind,
+		n: Math.max(1, count | 0)
+	};
+}
+var SCRIPT = [
+	{
+		title: "Probe Wake",
+		threat: "Ram probes",
+		blurb: "Unarmed scouts. Strafe, don’t sit still.",
+		spawns: [n("scout", 7)]
+	},
+	{
+		title: "Coil Line",
+		threat: "Fighter tracers",
+		blurb: "Single aimed bolts. Cut across their aim.",
+		spawns: [n("scout", 5), n("fighter", 4)]
+	},
+	{
+		title: "Tri-Vane",
+		threat: "Bomber spread",
+		blurb: "Triple cones. The middle shot is a lie.",
+		spawns: [
+			n("scout", 4),
+			n("fighter", 2),
+			n("bomber", 3)
+		]
+	},
+	{
+		title: "Shard Bloom",
+		threat: "Splitters",
+		blurb: "Shards hatch mites on death. Kill them cold.",
+		spawns: [n("shard", 6), n("scout", 3)]
+	},
+	{
+		title: "Old Ironside",
+		threat: "Cruiser battery",
+		blurb: "A heavy hull and escorts. Break the screen first.",
+		spawns: [
+			n("cruiser", 1),
+			n("fighter", 4),
+			n("scout", 4)
+		]
+	},
+	{
+		title: "Rail Net",
+		threat: "Lance rails",
+		blurb: "Snipers telegraph a beam, then fire a rail. Sidestep the line.",
+		spawns: [n("lance", 4), n("fighter", 3)]
+	},
+	{
+		title: "Minefield",
+		threat: "Mine layers",
+		blurb: "Miners seed fused charges. Clear the floor or eat the bloom.",
+		spawns: [n("miner", 4), n("scout", 5)]
+	},
+	{
+		title: "Flak Wolves",
+		threat: "Shotgun cones",
+		blurb: "They only bite up close. Keep the range or eat pellets.",
+		spawns: [n("flak", 5), n("fighter", 2)]
+	},
+	{
+		title: "Mortar Choir",
+		threat: "Fat shells",
+		blurb: "Slow, heavy rounds. Never stop moving.",
+		spawns: [
+			n("mortar", 4),
+			n("scout", 5),
+			n("bomber", 2)
+		]
+	},
+	{
+		title: "Siege Wake",
+		threat: "Mixed battery",
+		blurb: "Cruiser, rails, and mines. Spend forge like you mean it.",
+		spawns: [
+			n("cruiser", 1),
+			n("lance", 3),
+			n("miner", 2),
+			n("fighter", 3)
+		]
+	}
+];
+var CYCLE = [
+	{
+		title: "Shard Storm",
+		threat: "Splitters+",
+		blurb: "More blooms, faster mites.",
+		spawns: [n("shard", 8), n("flak", 3)]
+	},
+	{
+		title: "Crossfire",
+		threat: "Rails and cones",
+		blurb: "Lances at range, flak if you hide close.",
+		spawns: [
+			n("lance", 5),
+			n("flak", 4),
+			n("scout", 4)
+		]
+	},
+	{
+		title: "Seeded Void",
+		threat: "Mines and mortars",
+		blurb: "Floor and sky both kill.",
+		spawns: [
+			n("miner", 5),
+			n("mortar", 4),
+			n("fighter", 3)
+		]
+	},
+	{
+		title: "Twin Siege",
+		threat: "Double cruiser",
+		blurb: "Two heavies. Strip escorts, then the hulls.",
+		spawns: [
+			n("cruiser", 2),
+			n("lance", 2),
+			n("bomber", 3)
+		]
+	}
+];
+function waveSpec(wave) {
+	if (wave <= SCRIPT.length) return SCRIPT[wave - 1];
+	const extra = wave - SCRIPT.length;
+	const base = CYCLE[(extra - 1) % CYCLE.length];
+	const bump = 1 + Math.floor((wave - 1) / 10);
+	return {
+		title: `${base.title} ${bump > 1 ? `Mk.${bump}` : ""}`.trim(),
+		threat: base.threat,
+		blurb: base.blurb,
+		spawns: base.spawns.map((s) => ({
+			kind: s.kind,
+			n: s.n + Math.floor(extra / 4)
+		}))
+	};
+}
 var STEP = 1 / 60;
 var MAX_DT = .1;
 var PAD = 28;
-var ENEMY_CAP = 72;
-var BULLET_CAP = 220;
+var ENEMY_CAP = 96;
+var BULLET_CAP = 280;
 var PART_CAP = 420;
 var KIND = {
 	scout: {
@@ -736,7 +1016,8 @@ var KIND = {
 		r: 14,
 		value: 100,
 		fire: 0,
-		frame: 0
+		frame: 0,
+		color: "#c56b6b"
 	},
 	fighter: {
 		hp: 5,
@@ -744,7 +1025,8 @@ var KIND = {
 		r: 18,
 		value: 250,
 		fire: 1.55,
-		frame: 1
+		frame: 1,
+		color: "#c56b6b"
 	},
 	bomber: {
 		hp: 11,
@@ -752,7 +1034,8 @@ var KIND = {
 		r: 22,
 		value: 420,
 		fire: 2.1,
-		frame: 2
+		frame: 2,
+		color: "#c56b6b"
 	},
 	cruiser: {
 		hp: 48,
@@ -760,7 +1043,71 @@ var KIND = {
 		r: 36,
 		value: 1600,
 		fire: 1.05,
-		frame: 3
+		frame: 3,
+		color: "#c56b6b"
+	},
+	lance: {
+		hp: 7,
+		spd: 78,
+		r: 16,
+		value: 340,
+		fire: 0,
+		frame: -1,
+		color: "#e8eaef"
+	},
+	miner: {
+		hp: 9,
+		spd: 62,
+		r: 18,
+		value: 380,
+		fire: 2.35,
+		frame: -1,
+		color: "#7dba9a"
+	},
+	mine: {
+		hp: 3,
+		spd: 0,
+		r: 11,
+		value: 40,
+		fire: 0,
+		frame: -1,
+		color: "#c56b6b"
+	},
+	shard: {
+		hp: 4,
+		spd: 120,
+		r: 13,
+		value: 180,
+		fire: 0,
+		frame: -1,
+		color: "#8eb8c8"
+	},
+	mite: {
+		hp: 1,
+		spd: 190,
+		r: 8,
+		value: 40,
+		fire: 0,
+		frame: -1,
+		color: "#8eb8c8"
+	},
+	flak: {
+		hp: 6,
+		spd: 128,
+		r: 16,
+		value: 280,
+		fire: 1.35,
+		frame: -1,
+		color: "#c56b6b"
+	},
+	mortar: {
+		hp: 10,
+		spd: 58,
+		r: 20,
+		value: 400,
+		fire: 2.4,
+		frame: -1,
+		color: "#c56b6b"
 	}
 };
 var PICK_FRAME = {
@@ -811,7 +1158,9 @@ var Game = class {
 		fireCd: 0,
 		flash: 0,
 		knock: 0,
-		aim: 0
+		aim: 0,
+		charge: 0,
+		spin: 0
 	}));
 	bullets = pool(BULLET_CAP, () => ({
 		alive: false,
@@ -875,6 +1224,11 @@ var Game = class {
 	comboT = 0;
 	waveWait = 0;
 	inWave = false;
+	clearing = false;
+	clearT = 0;
+	clearDur = 3.2;
+	clearBonus = 1;
+	timeScale = 1;
 	banner = "";
 	bannerT = 0;
 	trauma = 0;
@@ -935,7 +1289,7 @@ var Game = class {
 			this.last = now;
 			if (dt > MAX_DT) dt = MAX_DT;
 			this.acc += dt;
-			const frozen = this.phase === "title" || this.phase === "paused" || this.phase === "skills" || this.phase === "scores" || this.phase === "help" || this.phase === "gameover";
+			const frozen = this.phase === "title" || this.phase === "paused" || this.phase === "skills" || this.phase === "forge" || this.phase === "scores" || this.phase === "help" || this.phase === "gameover";
 			const actions = this.input.sample();
 			this.handlePhaseInput(actions);
 			while (this.acc >= STEP) {
@@ -972,16 +1326,19 @@ var Game = class {
 				if (this.phase === "playing") this.setPhase("paused");
 			},
 			openSkills: () => {
+				if (this.clearing) return;
 				if (this.phase === "playing" || this.phase === "paused") {
 					this.fromPause = this.phase === "paused";
 					this.setPhase("skills");
 				}
 			},
 			closeSkills: () => {
+				if (this.phase === "forge") return;
 				if (this.wave === 0) this.setPhase("title");
 				else this.setPhase(this.fromPause ? "paused" : "playing");
 			},
 			buySkill: (id) => this.buySkill(id),
+			advanceWave: () => this.advanceWave(),
 			submitName: (name) => this.submitName(name),
 			toTitle: () => {
 				this.clearCombat();
@@ -1012,11 +1369,23 @@ var Game = class {
 		getSpeed: () => Math.hypot(this.player.vx, this.player.vy),
 		getX: () => this.player.x,
 		getY: () => this.player.y,
+		getWave: () => this.wave,
+		getPhase: () => this.phase,
+		getLive: () => this.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0),
+		getClearing: () => this.clearing,
 		setKeys: (codes) => this.input.setKeys(codes),
 		setSteer: (v) => {
 			if (v > .2) this.input.setKeys(["KeyA"]);
 			else if (v < -.2) this.input.setKeys(["KeyD"]);
 			else this.input.setKeys([]);
+		},
+		skipWave: () => {
+			for (const e of this.enemies) e.alive = false;
+			if (this.phase === "playing" || this.clearing) this.finishWave(true);
+		},
+		holdClear: () => {
+			for (const e of this.enemies) e.alive = false;
+			if (this.phase === "playing" || this.clearing) this.finishWave(false);
 		}
 	};
 	bindControlsTest() {
@@ -1037,13 +1406,17 @@ var Game = class {
 		this.combo = 0;
 		this.comboT = 0;
 		this.trauma = 0;
+		this.clearing = false;
+		this.clearT = 0;
+		this.timeScale = 1;
 		this.clearCombat();
 		this.resetPlayer(true);
 		this.input.clearPointerAim();
+		useGame.getState().setOwned(["core"]);
+		useGame.getState().setSkillId("core");
+		useGame.getState().setQualify(false, 0, 0);
 		this.setPhase("playing");
 		this.nextWave();
-		useGame.getState().setOwned(["core"]);
-		useGame.getState().setQualify(false, 0, 0);
 	}
 	submitName(name) {
 		const scores = submitScore({
@@ -1136,6 +1509,9 @@ var Game = class {
 		for (const m of this.muzzles) m.alive = false;
 		this.inWave = false;
 		this.waveWait = 0;
+		this.clearing = false;
+		this.clearT = 0;
+		this.timeScale = 1;
 	}
 	resize() {
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1164,45 +1540,203 @@ var Game = class {
 		}));
 	}
 	handlePhaseInput(a) {
+		if (a.mute) {
+			const cur = useGame.getState().settings;
+			this.apiHandle?.setSettings({ mute: !cur.mute });
+		}
+		if (this.phase === "forge") {
+			if (a.menuDX || a.menuDY) this.navSkills(a.menuDX, a.menuDY);
+			if (a.confirm) {
+				const id = useGame.getState().skillId;
+				if (!this.buySkill(id)) this.advanceWave();
+			}
+			return;
+		}
+		if (a.skills) {
+			if (!this.clearing && (this.phase === "playing" || this.phase === "paused")) {
+				this.fromPause = this.phase === "paused";
+				this.setPhase("skills");
+			}
+		}
 		if (a.pause) {
 			if (this.phase === "title") this.startRun();
 			else if (this.phase === "playing") this.setPhase("paused");
 			else if (this.phase === "paused") this.setPhase("playing");
 			else if (this.phase === "skills") this.setPhase(this.fromPause ? "paused" : "playing");
 			else if (this.phase === "help" || this.phase === "scores") this.setPhase("title");
+			else if (this.phase === "gameover") this.toTitleSafe();
 		}
-		if (a.confirm) {
-			if (this.phase === "title" || this.phase === "help" || this.phase === "scores") this.startRun();
-			else if (this.phase === "paused") this.setPhase("playing");
-			else if (this.phase === "gameover" && !useGame.getState().qualify) this.startRun();
+		if (a.back) {
+			if (this.phase === "paused") this.setPhase("playing");
+			else if (this.phase === "skills") this.setPhase(this.fromPause ? "paused" : "playing");
+			else if (this.phase === "help" || this.phase === "scores") this.setPhase("title");
+			else if (this.phase === "gameover") this.toTitleSafe();
 		}
+		if (this.phase !== "playing") {
+			if (a.menuDX || a.menuDY) this.nudgeMenu(a.menuDX, a.menuDY);
+			if (a.confirm) this.activateMenu();
+		}
+	}
+	toTitleSafe() {
+		this.clearCombat();
+		this.wave = 0;
+		this.setPhase("title");
+	}
+	menuLen() {
+		switch (this.phase) {
+			case "title": return 3;
+			case "paused": return 5;
+			case "help":
+			case "scores": return 1;
+			case "gameover": return useGame.getState().qualify ? 1 : 3;
+			default: return 0;
+		}
+	}
+	nudgeMenu(dx, dy) {
+		if (this.phase === "skills" || this.phase === "forge") {
+			this.navSkills(dx, dy);
+			return;
+		}
+		const n = this.menuLen();
+		if (n <= 0) return;
+		const step = dy !== 0 ? dy : dx;
+		if (!step) return;
+		const cur = useGame.getState().menuIndex;
+		useGame.getState().setMenuIndex((cur + step + n * 8) % n);
+	}
+	navSkills(dx, dy) {
+		const id = useGame.getState().skillId;
+		const cur = SKILL_BY_ID[id];
+		let best = null;
+		let bestScore = Infinity;
+		const nd = Math.hypot(dx, dy) || 1;
+		const ux = dx / nd;
+		const uy = dy / nd;
+		for (const s of SKILLS) {
+			if (s.id === id) continue;
+			const vx = s.x - cur.x;
+			const vy = s.y - cur.y;
+			const mag = Math.hypot(vx, vy) || 1;
+			const dot = vx / mag * ux + vy / mag * uy;
+			if (dot < .28) continue;
+			const score = mag / dot;
+			if (score < bestScore) {
+				bestScore = score;
+				best = s.id;
+			}
+		}
+		if (best) useGame.getState().setSkillId(best);
+	}
+	activateMenu() {
+		const i = useGame.getState().menuIndex;
+		if (this.phase === "title") {
+			if (i === 1) this.setPhase("help");
+			else if (i === 2) this.setPhase("scores");
+			else this.startRun();
+			return;
+		}
+		if (this.phase === "paused") {
+			if (i === 1) {
+				this.fromPause = true;
+				this.setPhase("skills");
+			} else if (i === 2) this.apiHandle?.setSettings({ mute: !useGame.getState().settings.mute });
+			else if (i === 3) this.apiHandle?.setSettings({ shake: !useGame.getState().settings.shake });
+			else if (i === 4) this.toTitleSafe();
+			else this.setPhase("playing");
+			return;
+		}
+		if (this.phase === "help" || this.phase === "scores") {
+			this.setPhase("title");
+			return;
+		}
+		if (this.phase === "gameover") {
+			if (useGame.getState().qualify) this.submitName("Pilot");
+			else if (i === 1) this.setPhase("scores");
+			else if (i === 2) this.toTitleSafe();
+			else this.startRun();
+			return;
+		}
+		if (this.phase === "skills") this.buySkill(useGame.getState().skillId);
+	}
+	advanceWave() {
+		if (this.phase !== "forge") return;
+		this.input.clearPointerAim();
+		for (const b of this.bullets) b.alive = false;
+		this.setPhase("playing");
+		this.nextWave();
+	}
+	openForgeBay() {
+		const next = this.wave + 1;
+		const spec = waveSpec(next);
+		useGame.getState().setBriefing({
+			cleared: this.wave,
+			next,
+			title: spec.title,
+			blurb: spec.blurb,
+			threat: spec.threat
+		});
+		this.fromPause = false;
+		this.clearing = false;
+		this.clearT = 0;
+		this.timeScale = 1;
+		this.hitstop = 0;
+		let pick = useGame.getState().skillId;
+		for (const s of SKILLS) if (!this.owned.has(s.id) && isAvailable(s.id, this.owned)) {
+			pick = s.id;
+			break;
+		}
+		useGame.getState().setSkillId(pick);
+		this.setPhase("forge");
+	}
+	finishWave(immediate) {
+		if (this.phase === "forge" || this.phase === "skills" || this.phase === "gameover") return;
+		if (!this.inWave && !this.clearing) return;
+		if (this.inWave) {
+			this.inWave = false;
+			const bonus = this.wave % 5 === 0 ? 2 : 1;
+			this.clearBonus = bonus;
+			this.forge += bonus;
+			this.score += this.wave * 500;
+			this.float(this.player.x, this.player.y - 30, bonus > 1 ? "FORGE +2" : "FORGE +1", "#8eb8c8");
+			sfx("wave");
+			this.publishHud();
+		}
+		if (immediate || this.reduced) {
+			this.clearing = false;
+			this.clearT = 0;
+			this.timeScale = 1;
+			this.banner = this.clearBonus > 1 ? "Wave cleared · Forge +2" : "Wave cleared · Forge +1";
+			this.bannerT = 1.4;
+			this.openForgeBay();
+			return;
+		}
+		this.clearing = true;
+		this.clearT = 0;
+		this.clearDur = 3.2;
+		this.timeScale = .14;
+		this.hitstop = Math.max(this.hitstop, .22);
+		this.trauma = Math.min(1, this.trauma + .42);
+		this.banner = "";
+		this.bannerT = 0;
+		this.input.rumble(.4, .75, 200);
+		for (const b of this.bullets) if (!b.friendly) b.ttl = Math.min(b.ttl, .55);
 	}
 	nextWave() {
 		this.wave += 1;
 		this.inWave = true;
-		this.waveWait = 2.4;
-		this.banner = this.wave % 5 === 0 ? `Cruiser inbound · Wave ${this.wave}` : `Wave ${this.wave}`;
-		this.bannerT = 2.1;
+		this.waveWait = 0;
+		const spec = waveSpec(this.wave);
+		this.banner = `Wave ${this.wave} · ${spec.title}`;
+		this.bannerT = 2.4;
 		sfx("wave");
-		const n = this.wave;
 		let spawned = 0;
-		const spawn = (kind, count) => {
-			for (let i = 0; i < count; i++) if (this.spawnEnemy(kind)) spawned += 1;
-		};
-		spawn("scout", 3 + n);
-		spawn("fighter", Math.max(0, n - 1));
-		spawn("bomber", Math.max(0, Math.floor((n - 3) / 2)));
-		if (n % 5 === 0) spawn("cruiser", 1);
-		if (n >= 8) spawn("fighter", Math.floor(n / 4));
+		for (const row of spec.spawns) for (let i = 0; i < row.n; i++) if (this.spawnEnemy(row.kind)) spawned += 1;
 		if (spawned === 0) {
 			this.spawnEnemy("scout");
 			this.spawnEnemy("scout");
 		}
 	}
 	spawnEnemy(kind) {
-		const e = this.enemies.find((x) => !x.alive);
-		if (!e) return false;
-		const spec = KIND[kind];
 		const edge = Math.random() * 4 | 0;
 		let x = 0;
 		let y = 0;
@@ -1225,20 +1759,29 @@ var Game = class {
 			x = this.player.x + (dx >= 0 ? -220 : 220);
 			y = rand(40, this.h - 40);
 		}
+		return this.placeEnemy(kind, x, y);
+	}
+	placeEnemy(kind, x, y) {
+		const e = this.enemies.find((q) => !q.alive);
+		if (!e) return false;
+		const spec = KIND[kind];
 		e.alive = true;
 		e.kind = kind;
 		e.x = x;
 		e.y = y;
 		e.vx = 0;
 		e.vy = 0;
-		e.hp = spec.hp + Math.floor(this.wave * (kind === "cruiser" ? 2.2 : .35));
+		const hpScale = kind === "cruiser" ? 2.2 : kind === "mite" || kind === "mine" ? 0 : .35;
+		e.hp = spec.hp + Math.floor(this.wave * hpScale);
 		e.maxHp = e.hp;
 		e.r = spec.r;
 		e.value = spec.value;
-		e.fireCd = rand(.4, spec.fire || 1);
+		e.fireCd = kind === "mine" ? 0 : rand(.3, spec.fire || 1.2);
 		e.flash = 0;
 		e.knock = 0;
 		e.aim = Math.atan2(this.player.y - y, this.player.x - x);
+		e.charge = kind === "mine" ? rand(.4, 1.2) : 0;
+		e.spin = Math.random() * Math.PI * 2;
 		return true;
 	}
 	spawnPickup(x, y, kind) {
@@ -1316,6 +1859,22 @@ var Game = class {
 		for (const p of this.parts) if (p.alive) this.stepPart(p, dt);
 	}
 	step(dt, a) {
+		if (this.clearing) {
+			this.clearT += dt;
+			const u = clamp(this.clearT / this.clearDur, 0, 1);
+			const hold = .3;
+			const rest = (u - hold) / .7;
+			this.timeScale = u < hold ? .12 : .12 + (1 - Math.pow(1 - clamp(rest, 0, 1), 3)) * .7;
+			if (this.clearT >= this.clearDur) {
+				this.clearing = false;
+				this.timeScale = 1;
+				this.openForgeBay();
+				return;
+			}
+			dt *= this.timeScale;
+			this.player.invuln = Math.max(this.player.invuln, .2);
+			for (const b of this.bullets) if (!b.friendly) b.ttl = Math.min(b.ttl, .4);
+		} else this.timeScale = 1;
 		this.t += dt;
 		const p = this.player;
 		if (p.deadT > 0) {
@@ -1448,57 +2007,7 @@ var Game = class {
 		const p = this.player;
 		for (const e of this.enemies) {
 			if (!e.alive) continue;
-			const spec = KIND[e.kind];
-			const dx = p.x - e.x;
-			const dy = p.y - e.y;
-			const dist = Math.hypot(dx, dy) || 1;
-			let tx = dx / dist;
-			let ty = dy / dist;
-			if (e.kind === "cruiser" && dist < 180) {
-				tx = -ty;
-				ty = dx / dist;
-			}
-			for (const o of this.enemies) {
-				if (!o.alive || o === e) continue;
-				const sx = e.x - o.x;
-				const sy = e.y - o.y;
-				const sd = Math.hypot(sx, sy);
-				if (sd > 0 && sd < e.r + o.r + 10) {
-					tx += sx / sd * .7;
-					ty += sy / sd * .7;
-				}
-			}
-			const tn = Math.hypot(tx, ty) || 1;
-			const spd = spec.spd * (1 + this.wave * .03);
-			e.vx = tx / tn * spd;
-			e.vy = ty / tn * spd;
-			if (e.knock > 0) {
-				e.x += e.vx * dt * .2;
-				e.y += e.vy * dt * .2;
-				e.knock -= dt;
-			} else {
-				e.x += e.vx * dt;
-				e.y += e.vy * dt;
-			}
-			e.aim = Math.atan2(dy, dx);
-			if (e.flash > 0) e.flash -= dt;
-			if (spec.fire > 0) {
-				e.fireCd -= dt;
-				if (e.fireCd <= 0 && dist < 560 && p.deadT <= 0) {
-					e.fireCd = spec.fire * (e.kind === "cruiser" ? 1 : 1 + Math.random() * .2);
-					const ang = e.aim;
-					if (e.kind === "bomber") for (const off of [
-						-.22,
-						0,
-						.22
-					]) this.fireBullet(e.x, e.y, ang + off, 240, false, 1, 5, 2.4);
-					else if (e.kind === "cruiser") {
-						this.fireBullet(e.x, e.y, ang, 280, false, 1, 6, 2.6);
-						this.fireBullet(e.x, e.y, ang + .18, 260, false, 1, 5, 2.4);
-						this.fireBullet(e.x, e.y, ang - .18, 260, false, 1, 5, 2.4);
-					} else this.fireBullet(e.x, e.y, ang, 270, false, 1, 4.5, 2.2);
-				}
-			}
+			this.stepEnemy(e, dt);
 		}
 		for (const b of this.bullets) {
 			if (!b.alive) continue;
@@ -1549,6 +2058,143 @@ var Game = class {
 			if (m.life <= 0) m.alive = false;
 		}
 	}
+	stepEnemy(e, dt) {
+		const p = this.player;
+		const spec = KIND[e.kind];
+		if (e.flash > 0) e.flash -= dt;
+		if (e.knock > 0) e.knock -= dt;
+		e.spin += dt;
+		if (e.fireCd > 0) e.fireCd -= dt;
+		const dx = p.x - e.x;
+		const dy = p.y - e.y;
+		const dist = Math.hypot(dx, dy) || 1;
+		const ux = dx / dist;
+		const uy = dy / dist;
+		if (e.kind === "mine") {
+			e.vx *= Math.exp(-3 * dt);
+			e.vy *= Math.exp(-3 * dt);
+			e.x += e.vx * dt;
+			e.y += e.vy * dt;
+			e.charge += dt;
+			if (e.charge >= 4.2 || dist < 40) this.killEnemy(e);
+			return;
+		}
+		let tx = ux;
+		let ty = uy;
+		let spd = spec.spd;
+		if (e.kind === "lance") {
+			if (e.charge > 0) {
+				spd *= .18;
+				e.charge += dt;
+				if (e.charge >= 1.08) {
+					this.fireBullet(e.x + Math.cos(e.aim) * e.r, e.y + Math.sin(e.aim) * e.r, e.aim, 820, false, 2, 4.6, .95);
+					this.muzzle(e.x, e.y, e.aim);
+					sfx("shoot");
+					e.charge = 0;
+					e.fireCd = 1.65;
+				}
+			} else {
+				if (dist < 240) {
+					tx = -ux;
+					ty = -uy;
+					spd *= 1.15;
+				} else if (dist > 420) {
+					tx = ux;
+					ty = uy;
+				} else {
+					tx = -uy;
+					ty = ux;
+					spd *= .85;
+				}
+				if (e.fireCd <= 0 && dist > 200 && dist < 460) {
+					e.charge = .001;
+					e.aim = Math.atan2(dy, dx);
+				}
+			}
+		} else if (e.kind === "miner") {
+			spd *= .9;
+			if (dist < 90) {
+				tx = -ux;
+				ty = -uy;
+			}
+			if (e.fireCd <= 0 && e.charge < 3 && dist > 70) {
+				if (this.placeEnemy("mine", e.x - ux * 18, e.y - uy * 18)) {
+					e.charge += 1;
+					e.fireCd = spec.fire;
+				}
+			}
+		} else if (e.kind === "flak") {
+			if (dist > 220) spd *= 1.12;
+			else {
+				spd *= .55;
+				tx = -uy;
+				ty = ux;
+			}
+			if (e.fireCd <= 0 && dist < 240) {
+				e.fireCd = spec.fire;
+				e.aim = Math.atan2(dy, dx);
+				for (const off of [
+					-.42,
+					-.22,
+					0,
+					.22,
+					.42
+				]) this.fireBullet(e.x, e.y, e.aim + off, 390, false, 1, 3.1, .42);
+			}
+		} else if (e.kind === "mortar") {
+			if (dist < 160) {
+				tx = -ux;
+				ty = -uy;
+			}
+			if (e.fireCd <= 0) {
+				e.fireCd = spec.fire;
+				e.aim = Math.atan2(dy, dx);
+				this.fireBullet(e.x, e.y, e.aim, 175, false, 2, 7.2, 2.5);
+				this.muzzle(e.x, e.y, e.aim);
+			}
+		} else if (e.kind === "fighter" || e.kind === "bomber" || e.kind === "cruiser") {
+			if (e.kind === "cruiser" && dist < 140) {
+				tx = -ux;
+				ty = -uy;
+			}
+			if (e.fireCd <= 0 && spec.fire > 0) {
+				e.fireCd = spec.fire * (.85 + Math.random() * .3);
+				e.aim = Math.atan2(dy, dx);
+				if (e.kind === "fighter") this.fireBullet(e.x, e.y, e.aim, 340, false, 1, 3.6, 1.15);
+				else if (e.kind === "bomber") for (const off of [
+					-.22,
+					0,
+					.22
+				]) this.fireBullet(e.x, e.y, e.aim + off, 290, false, 1, 3.8, 1.2);
+				else for (const off of [
+					-.18,
+					-.06,
+					.06,
+					.18
+				]) this.fireBullet(e.x, e.y, e.aim + off, 300, false, 1, 4, 1.3);
+			}
+		} else if (e.kind === "mite") spd *= 1.08;
+		if (e.kind !== "lance" || e.charge <= 0) e.aim = Math.atan2(dy, dx);
+		const accel = 4.8;
+		const knockMul = e.knock > 0 ? .35 : 1;
+		e.vx += (tx * spd - e.vx) * Math.min(1, accel * dt) * knockMul;
+		e.vy += (ty * spd - e.vy) * Math.min(1, accel * dt) * knockMul;
+		for (const o of this.enemies) {
+			if (!o.alive || o === e || o.kind === "mine") continue;
+			const ox = e.x - o.x;
+			const oy = e.y - o.y;
+			const d2 = ox * ox + oy * oy;
+			const min = e.r + o.r + 10;
+			if (d2 < min * min && d2 > .25) {
+				const d = Math.sqrt(d2);
+				const push = (min - d) / min * 70;
+				e.vx += ox / d * push;
+				e.vy += oy / d * push;
+			}
+		}
+		e.x += e.vx * dt;
+		e.y += e.vy * dt;
+	}
 	stepPart(q, dt) {
 		q.x += q.vx * dt;
 		q.y += q.vy * dt;
@@ -1580,7 +2226,7 @@ var Game = class {
 				const dy = b.y - p.y;
 				if (dx * dx + dy * dy < (b.r + p.radius) * (b.r + p.radius)) {
 					b.alive = false;
-					this.hurtPlayer(1);
+					this.hurtPlayer(b.dmg);
 				}
 			}
 		}
@@ -1590,6 +2236,10 @@ var Game = class {
 				const dx = e.x - p.x;
 				const dy = e.y - p.y;
 				if (dx * dx + dy * dy < (e.r + p.radius) * (e.r + p.radius)) {
+					if (e.kind === "mine") {
+						this.killEnemy(e);
+						continue;
+					}
 					if (p.invuln <= 0) this.hurtPlayer(1);
 					const n = Math.hypot(dx, dy) || 1;
 					e.x += dx / n * 8;
@@ -1637,23 +2287,32 @@ var Game = class {
 		if (e.hp <= 0) this.killEnemy(e);
 	}
 	killEnemy(e) {
+		if (!e.alive) return;
+		const kind = e.kind;
+		const x = e.x;
+		const y = e.y;
 		e.alive = false;
 		this.combo = Math.min(8, this.combo + 1);
 		this.comboT = 1.25;
-		const pts = e.value * this.combo;
+		const pts = kind === "mine" ? e.value : e.value * this.combo;
 		this.score += pts;
-		this.float(e.x, e.y, `+${pts}`, "#e8eaef");
-		this.burst(e.x, e.y, e.kind === "cruiser" ? 36 : 16, e.kind === "cruiser" ? "#c56b6b" : "#d48a6a", 260);
-		this.trauma = Math.min(1, this.trauma + (e.kind === "cruiser" ? .55 : .18));
-		this.hitstop = e.kind === "cruiser" ? .07 : .028;
+		this.float(x, y, `+${pts}`, "#e8eaef");
+		this.burst(x, y, kind === "cruiser" ? 36 : kind === "mine" ? 24 : 16, kind === "cruiser" || kind === "mine" ? "#c56b6b" : "#d48a6a", 260);
+		this.trauma = Math.min(1, this.trauma + (kind === "cruiser" ? .55 : kind === "mine" ? .32 : .18));
+		this.hitstop = kind === "cruiser" ? .07 : .028;
 		sfx("explode");
-		this.input.rumble(e.kind === "cruiser" ? .7 : .25, .5, e.kind === "cruiser" ? 140 : 40);
-		const drop = e.kind === "cruiser" ? 1 : e.kind === "bomber" ? .28 : .12;
-		if (Math.random() < drop) this.spawnPickup(e.x, e.y);
-		if (e.kind === "cruiser") {
-			this.spawnPickup(e.x + 16, e.y, "shield");
+		this.input.rumble(kind === "cruiser" ? .7 : .25, .5, kind === "cruiser" ? 140 : 40);
+		if (Math.random() < (kind === "cruiser" ? 1 : kind === "bomber" || kind === "mortar" ? .28 : kind === "mine" || kind === "mite" ? .04 : .12)) this.spawnPickup(x, y);
+		if (kind === "cruiser") {
+			this.spawnPickup(x + 16, y, "shield");
 			this.forge += 1;
 		}
+		if (kind === "shard") {
+			const a = Math.random() * Math.PI * 2;
+			this.placeEnemy("mite", x + Math.cos(a) * 16, y + Math.sin(a) * 16);
+			this.placeEnemy("mite", x - Math.cos(a) * 16, y - Math.sin(a) * 16);
+		}
+		if (kind === "mine" && this.player.deadT <= 0 && Math.hypot(this.player.x - x, this.player.y - y) < 86) this.hurtPlayer(2);
 	}
 	hurtPlayer(n) {
 		const p = this.player;
@@ -1682,24 +2341,12 @@ var Game = class {
 			sfx("explode");
 		}
 	}
-	waveLogic(dt) {
-		if (!this.inWave) {
-			this.waveWait -= dt;
-			if (this.waveWait <= 0) this.nextWave();
-			return;
-		}
+	waveLogic(_dt) {
+		if (this.clearing) return;
+		if (!this.inWave) return;
 		let live = 0;
 		for (const e of this.enemies) if (e.alive) live++;
-		if (live === 0) {
-			this.inWave = false;
-			this.waveWait = 2.05;
-			this.forge += 1;
-			this.score += this.wave * 500;
-			this.banner = "Wave cleared · Forge +1";
-			this.bannerT = 2;
-			this.float(this.player.x, this.player.y - 30, "FORGE +1", "#8eb8c8");
-			sfx("wave");
-		}
+		if (live === 0) this.finishWave(false);
 	}
 	gameOver() {
 		sfx("over");
@@ -1748,7 +2395,8 @@ var Game = class {
 			banner: this.bannerT > 0 ? this.banner : "",
 			dashCd: p.dashCd,
 			unspent: this.forge,
-			padOn: this.padOn || this.input.padLive
+			padOn: this.padOn || this.input.padLive,
+			canDash: this.canDash
 		};
 		useGame.getState().setHud(snap);
 	}
@@ -1795,9 +2443,21 @@ var Game = class {
 		}
 		for (const b of this.bullets) {
 			if (!b.alive) continue;
+			const fat = !b.friendly && b.r >= 6;
 			const sheet = b.friendly ? this.atlas?.boltPlayer : this.atlas?.boltEnemy;
 			const frame = (this.t * 12 | 0) % 4;
-			if (sheet) drawFrame(ctx, sheet, frame, b.x, b.y, b.friendly ? 18 : 16, b.friendly ? 28 : 22, b.rot + Math.PI / 2);
+			if (fat) {
+				ctx.save();
+				ctx.translate(b.x, b.y);
+				ctx.fillStyle = "#c56b6b";
+				ctx.beginPath();
+				ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.strokeStyle = "rgba(232,234,239,0.55)";
+				ctx.lineWidth = 1.6;
+				ctx.stroke();
+				ctx.restore();
+			} else if (sheet) drawFrame(ctx, sheet, frame, b.x, b.y, b.friendly ? 18 : 16, b.friendly ? 28 : 22, b.rot + Math.PI / 2);
 			else {
 				ctx.save();
 				ctx.translate(b.x, b.y);
@@ -1811,17 +2471,31 @@ var Game = class {
 			if (!e.alive) continue;
 			const spec = KIND[e.kind];
 			const size = spec.r * 2.6;
+			if (e.kind === "lance" && e.charge > .05) {
+				const pulse = .16 + e.charge * .72;
+				ctx.save();
+				ctx.strokeStyle = `rgba(232,234,239,${pulse})`;
+				ctx.lineWidth = 1.2 + e.charge * 2.4;
+				ctx.setLineDash([5, 7]);
+				ctx.beginPath();
+				ctx.moveTo(e.x, e.y);
+				ctx.lineTo(e.x + Math.cos(e.aim) * 640, e.y + Math.sin(e.aim) * 640);
+				ctx.stroke();
+				ctx.setLineDash([]);
+				ctx.restore();
+			}
 			ctx.save();
 			if (e.flash > 0) ctx.globalCompositeOperation = "lighter";
-			if (this.atlas?.enemies) drawFrame(ctx, this.atlas.enemies, spec.frame, e.x, e.y, size, size, e.aim + Math.PI / 2, e.flash > 0 ? 1 : 1);
-			else this.drawPoly(ctx, e.x, e.y, e.aim, spec.r, "#c56b6b");
+			if (spec.frame >= 0 && this.atlas?.enemies) drawFrame(ctx, this.atlas.enemies, spec.frame, e.x, e.y, size, size, e.aim + Math.PI / 2);
+			else this.drawEnemyShape(ctx, e);
 			ctx.restore();
-			if (e.kind === "cruiser" || e.hp < e.maxHp) {
+			if (e.kind === "cruiser" || e.kind === "mine" || e.hp < e.maxHp) {
 				const bw = spec.r * 2;
 				ctx.fillStyle = "rgba(8,9,13,0.6)";
 				ctx.fillRect(e.x - bw / 2, e.y - spec.r - 8, bw, 3);
-				ctx.fillStyle = "#c56b6b";
-				ctx.fillRect(e.x - bw / 2, e.y - spec.r - 8, bw * clamp(e.hp / e.maxHp, 0, 1), 3);
+				ctx.fillStyle = e.kind === "mine" ? "#8eb8c8" : "#c56b6b";
+				const frac = e.kind === "mine" ? clamp(1 - e.charge / 4.2, 0, 1) : clamp(e.hp / e.maxHp, 0, 1);
+				ctx.fillRect(e.x - bw / 2, e.y - spec.r - 8, bw * frac, 3);
 			}
 		}
 		const p = this.player;
@@ -1901,6 +2575,122 @@ var Game = class {
 			ctx.globalAlpha = 1;
 		}
 		ctx.restore();
+		this.drawClearing(ctx, w, h);
+	}
+	drawClearing(ctx, w, h) {
+		if (!this.clearing) return;
+		const u = clamp(this.clearT / this.clearDur, 0, 1);
+		const appear = clamp((u - .06) / .2, 0, 1);
+		const ease = 1 - Math.pow(1 - appear, 3);
+		const alpha = ease * clamp(u < .82 ? 1 : 1 - (u - .82) / .18, 0, 1);
+		ctx.fillStyle = `rgba(8,9,13,${Math.min(.52, .18 + ease * .34)})`;
+		ctx.fillRect(0, 0, w, h);
+		const ring = 1 - Math.pow(1 - clamp(u / .55, 0, 1), 2);
+		ctx.save();
+		ctx.strokeStyle = `rgba(142,184,200,${.28 * (1 - ring)})`;
+		ctx.lineWidth = 1.8;
+		ctx.beginPath();
+		ctx.arc(w / 2, h / 2, 28 + ring * Math.max(w, h) * .58, 0, Math.PI * 2);
+		ctx.stroke();
+		ctx.restore();
+		const y = h * .42 + (1 - ease) * 22;
+		ctx.save();
+		ctx.globalAlpha = alpha;
+		ctx.textAlign = "center";
+		ctx.fillStyle = "#8eb8c8";
+		ctx.font = "500 13px Oxanium, sans-serif";
+		ctx.fillText(`WAVE ${this.wave}`, w / 2, y - 28);
+		ctx.fillStyle = "#e8eaef";
+		ctx.font = `600 ${Math.round(clamp(w * .055, 28, 52))}px Oxanium, sans-serif`;
+		ctx.fillText("WAKE CLEARED", w / 2, y);
+		ctx.fillStyle = "#8eb8c8";
+		ctx.font = "500 16px Oxanium, sans-serif";
+		ctx.fillText(this.clearBonus > 1 ? "Forge +2" : "Forge +1", w / 2, y + 32);
+		ctx.fillStyle = "#8b90a0";
+		ctx.font = "500 12px Oxanium, sans-serif";
+		ctx.fillText("Holding for the forge bay", w / 2, y + 56);
+		ctx.restore();
+	}
+	drawEnemyShape(ctx, e) {
+		const spec = KIND[e.kind];
+		const r = spec.r;
+		ctx.save();
+		ctx.translate(e.x, e.y);
+		ctx.rotate(e.aim + Math.PI / 2);
+		ctx.fillStyle = spec.color;
+		ctx.strokeStyle = e.flash > 0 ? "#e8eaef" : "rgba(232,234,239,0.38)";
+		ctx.lineWidth = 1.25;
+		ctx.beginPath();
+		switch (e.kind) {
+			case "lance":
+				ctx.moveTo(0, -r * 1.45);
+				ctx.lineTo(r * .38, r * .7);
+				ctx.lineTo(0, r * .22);
+				ctx.lineTo(-r * .38, r * .7);
+				break;
+			case "miner":
+				for (let i = 0; i < 6; i++) {
+					const a = i / 6 * Math.PI * 2 - Math.PI / 2;
+					const px = Math.cos(a) * r;
+					const py = Math.sin(a) * r;
+					if (i === 0) ctx.moveTo(px, py);
+					else ctx.lineTo(px, py);
+				}
+				break;
+			case "mine": {
+				const rr = r * (1 + Math.sin(e.spin * 8 + e.charge * 4) * .12);
+				ctx.arc(0, 0, rr * .62, 0, Math.PI * 2);
+				ctx.closePath();
+				ctx.fill();
+				ctx.beginPath();
+				for (let i = 0; i < 8; i++) {
+					const a = i / 8 * Math.PI * 2 + e.spin;
+					ctx.moveTo(0, 0);
+					ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+				}
+				ctx.stroke();
+				ctx.restore();
+				return;
+			}
+			case "shard":
+				ctx.moveTo(0, -r * 1.2);
+				ctx.lineTo(r * .7, 0);
+				ctx.lineTo(0, r * .9);
+				ctx.lineTo(-r * .7, 0);
+				break;
+			case "mite":
+				ctx.moveTo(0, -r * 1.1);
+				ctx.lineTo(r * .7, r * .7);
+				ctx.lineTo(0, r * .2);
+				ctx.lineTo(-r * .7, r * .7);
+				break;
+			case "flak":
+				ctx.moveTo(0, -r);
+				ctx.lineTo(r * 1.05, r * .55);
+				ctx.lineTo(r * .3, r * .15);
+				ctx.lineTo(0, r * .75);
+				ctx.lineTo(-r * .3, r * .15);
+				ctx.lineTo(-r * 1.05, r * .55);
+				break;
+			case "mortar":
+				for (let i = 0; i < 5; i++) {
+					const a = i / 5 * Math.PI * 2 - Math.PI / 2;
+					const px = Math.cos(a) * r * 1.05;
+					const py = Math.sin(a) * r * 1.05;
+					if (i === 0) ctx.moveTo(px, py);
+					else ctx.lineTo(px, py);
+				}
+				break;
+			default:
+				ctx.moveTo(0, -r);
+				ctx.lineTo(r * .72, r * .7);
+				ctx.lineTo(0, r * .28);
+				ctx.lineTo(-r * .72, r * .7);
+		}
+		ctx.closePath();
+		ctx.fill();
+		ctx.stroke();
+		ctx.restore();
 	}
 	drawPoly(ctx, x, y, aim, r, color, squash = 1) {
 		ctx.save();
@@ -1954,9 +2744,9 @@ function Panel({ children, className }) {
 		children
 	});
 }
-function Overlay({ children }) {
+function Overlay({ children, className }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: "absolute inset-0 z-20 flex items-center justify-center bg-bg/70 p-4 backdrop-blur-[2px]",
+		className: cn("absolute inset-0 z-20 flex items-center justify-center bg-bg/70 p-4 pb-[max(5.5rem,env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:pb-4", className),
 		children
 	});
 }
@@ -1975,7 +2765,7 @@ function TitleScreen() {
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				className: "mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted",
-				children: "Twin-stick void combat. WASD strafes, mouse aims. The hull yaws onto the reticle — shots leave the nose."
+				children: "Twin-stick void combat. WASD or the left well strafes. Mouse, right stick, or the right well aims. The hull yaws onto the reticle — shots leave the nose. Clear a wave, spend forge in the bay, then Engage the next threat."
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "mt-6 flex flex-col gap-3",
@@ -2022,12 +2812,20 @@ function HelpScreen() {
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 					className: "text-fg",
 					children: "Controller"
-				}), " — left stick move, right stick aim, Start/Select pause, A to engage from the title, bumpers dash (if unlocked)."] }),
+				}), " — left stick move, right stick aim, RT fire, bumpers dash, A confirm, B back, Y/Select forge map, Start pause."] }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "text-fg",
+					children: "Keyboard only"
+				}), " — WASD move, arrows or IJKL aim, Enter confirm, Esc/P pause, F forge map, M mute."] }),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 					className: "text-fg",
 					children: "Touch"
-				}), " — drag on the left half to move, right half to aim. Sticks appear under your thumbs."] }),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Pickups: multi-shot, shield, speed, repair. Clear waves to earn Forge and open the skill map." })
+				}), " — left well strafes, right well aims. Auto-fire stays on. Blink dash is the pad between the wells. Pause and forge sit at the top."] }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "text-fg",
+					children: "Forge bay"
+				}), " — after every wave the bay holds. Spend forge on the constellation, then Engage the next hull. Each wake brings a new arm: ram probes, tracers, spread cones, splitters, cruisers, rails, mines, flak, mortars."] }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Pickups: multi-shot, shield, speed, repair." })
 			]
 		}),
 		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
@@ -2217,113 +3015,185 @@ function HighScores() {
 }
 function SkillMap() {
 	const api = useGame((s) => s.api);
+	const phase = useGame((s) => s.phase);
 	const owned = new Set(useGame((s) => s.owned));
 	const forge = useGame((s) => s.hud.forge);
-	const [sel, setSel] = (0, import_react.useState)("core");
+	const sel = useGame((s) => s.skillId);
+	const briefing = useGame((s) => s.briefing);
+	const bay = phase === "forge";
 	const def = SKILL_BY_ID[sel];
-	const canBuy = isAvailable(sel, owned) && forge >= def.cost && def.cost > 0;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Overlay, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "pointer-events-auto flex h-[min(720px,calc(100dvh-2rem))] w-[min(980px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface/94 shadow-[0_24px_80px_rgba(0,0,0,0.5)]",
-		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
-				className: "flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-					className: "font-display text-xs uppercase tracking-[0.22em] text-accent",
-					children: "Constellation"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
-					className: "font-display text-lg font-semibold",
-					children: "Forge map"
-				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "flex items-center gap-3",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-						className: "font-mono text-sm tabular-nums text-fg",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-							className: "text-muted",
-							children: "Forge "
-						}), forge]
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-						type: "button",
-						"aria-label": "Close forge map",
-						className: "grid size-11 place-items-center rounded-[12px] border border-border text-fg hover:bg-elevated",
-						onClick: () => api?.closeSkills(),
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
+	const canBuy = isAvailable(sel, owned) && forge >= def.cost && def.cost > 0 && !owned.has(sel);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Overlay, {
+		className: "p-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] sm:p-4",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			"data-forge-panel": true,
+			className: "pointer-events-auto flex h-[min(36rem,calc(100dvh-7rem))] w-[min(48rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface/94 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:h-[min(38rem,calc(100dvh-1.75rem))]",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+					className: "flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2 sm:px-4",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "min-w-0",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "font-display text-[0.65rem] uppercase tracking-[0.2em] text-accent",
+							children: bay ? `Wave ${briefing.cleared} cleared` : "Constellation"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "truncate font-display text-base font-semibold leading-tight",
+							children: bay ? `Next · ${briefing.title}` : "Forge map"
+						})]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex shrink-0 items-center gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							className: "font-mono text-sm tabular-nums text-fg",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-muted",
+								children: "Forge "
+							}), forge]
+						}), bay ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							"aria-label": "Close forge map",
+							className: "grid size-11 place-items-center rounded-[12px] border border-border text-fg hover:bg-elevated",
+							onClick: () => api?.closeSkills(),
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
+						})]
 					})]
-				})]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "relative min-h-0 flex-1 overflow-auto",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
-					viewBox: "0 0 1000 720",
-					className: "h-auto w-full min-w-[640px] min-h-[460px]",
-					children: [SKILL_EDGES.map(([a, b]) => {
-						const na = SKILL_BY_ID[a];
-						const nb = SKILL_BY_ID[b];
-						const on = owned.has(a) && owned.has(b);
-						return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
-							x1: na.x * 1e3,
-							y1: na.y * 720,
-							x2: nb.x * 1e3,
-							y2: nb.y * 720,
-							stroke: on ? "#8eb8c8" : "rgba(232,234,239,0.14)",
-							strokeWidth: on ? 2.4 : 1.2
-						}, `${a}-${b}`);
-					}), SKILLS.map((s) => {
-						const isOwned = owned.has(s.id);
-						const isAvail = isAvailable(s.id, owned) || s.id === "core";
+				}),
+				bay ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "shrink-0 border-b border-border px-3 py-1.5 sm:px-4",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "truncate font-display text-[0.65rem] uppercase tracking-[0.18em] text-accent",
+						children: [briefing.threat, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "ml-2 font-sans font-normal normal-case tracking-normal text-muted",
+							children: briefing.blurb
+						})]
+					})
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					"data-forge-map": true,
+					className: "relative min-h-0 flex-1 overflow-hidden",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+						viewBox: "0 0 1000 500",
+						preserveAspectRatio: "xMidYMid meet",
+						className: "h-full w-full",
+						children: [SKILL_EDGES.map(([a, b]) => {
+							const na = SKILL_BY_ID[a];
+							const nb = SKILL_BY_ID[b];
+							const on = owned.has(a) && owned.has(b);
+							return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+								x1: na.x * 1e3,
+								y1: na.y * 500,
+								x2: nb.x * 1e3,
+								y2: nb.y * 500,
+								stroke: on ? "#8eb8c8" : "rgba(232,234,239,0.14)",
+								strokeWidth: on ? 2.2 : 1.1
+							}, `${a}-${b}`);
+						}), SKILLS.map((s) => {
+							const isOwned = owned.has(s.id);
+							const isAvail = isAvailable(s.id, owned) || s.id === "core";
+							const selected = sel === s.id;
+							const cx = s.x * 1e3;
+							const cy = s.y * 500;
+							return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", {
+								transform: `translate(${cx} ${cy})`,
+								className: "cursor-pointer",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										r: 40,
+										fill: "transparent",
+										onClick: () => useGame.getState().setSkillId(s.id)
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										r: selected ? 24 : 20,
+										fill: isOwned ? "#8eb8c8" : isAvail ? "#1a1d27" : "#12141c",
+										stroke: selected ? "#e8eaef" : isAvail ? "#8eb8c8" : "rgba(232,234,239,0.2)",
+										strokeWidth: selected ? 2.4 : 1.3,
+										onClick: () => useGame.getState().setSkillId(s.id)
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+										textAnchor: "middle",
+										y: 5,
+										fill: isOwned ? "#08090d" : isAvail ? "#e8eaef" : "#5c6170",
+										fontSize: "11",
+										fontFamily: "Oxanium, sans-serif",
+										fontWeight: "600",
+										pointerEvents: "none",
+										children: s.id === "core" ? "CORE" : s.cost
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+										textAnchor: "middle",
+										y: 36,
+										fill: selected ? "#e8eaef" : isOwned || isAvail ? "#8b90a0" : "#5c6170",
+										fontSize: "10",
+										fontFamily: "Oxanium, sans-serif",
+										fontWeight: "500",
+										letterSpacing: "0.14em",
+										pointerEvents: "none",
+										children: s.short
+									})
+								]
+							}, s.id);
+						})]
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2 sm:hidden",
+					children: SKILLS.filter((s) => isAvailable(s.id, owned) || s.id === sel && s.id !== "core").map((s) => {
 						const selected = sel === s.id;
-						const cx = s.x * 1e3;
-						const cy = s.y * 720;
-						return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", {
-							transform: `translate(${cx} ${cy})`,
-							className: "cursor-pointer",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
-								r: selected ? 28 : 24,
-								fill: isOwned ? "#8eb8c8" : isAvail ? "#1a1d27" : "#12141c",
-								stroke: selected ? "#e8eaef" : isAvail ? "#8eb8c8" : "rgba(232,234,239,0.2)",
-								strokeWidth: selected ? 2.5 : 1.4,
-								onClick: () => setSel(s.id)
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
-								textAnchor: "middle",
-								y: 5,
-								fill: isOwned ? "#08090d" : isAvail ? "#e8eaef" : "#5c6170",
-								fontSize: "11",
-								fontFamily: "Oxanium, sans-serif",
-								fontWeight: "600",
-								pointerEvents: "none",
-								children: s.id === "core" ? "CORE" : s.cost
+						const buyable = isAvailable(s.id, owned) && forge >= s.cost;
+						return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: cn("h-11 min-w-[5.5rem] flex-1 rounded-[12px] border px-3 font-display text-xs font-medium tracking-wide", selected ? "border-fg bg-elevated text-fg" : "border-border bg-bg/40 text-muted"),
+							onClick: () => useGame.getState().setSkillId(s.id),
+							children: [s.short, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: cn("ml-2 tabular-nums", buyable ? "text-accent" : "text-subtle"),
+								children: s.cost
 							})]
 						}, s.id);
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", {
+					className: "flex shrink-0 flex-col gap-2 border-t border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "min-w-0 flex-1",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "truncate font-display text-sm font-semibold leading-tight",
+							children: def.name
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "truncate text-xs text-muted",
+							children: def.desc
+						})]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex w-full shrink-0 flex-row gap-2 sm:w-auto",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							variant: bay ? "ghost" : "primary",
+							size: "sm",
+							className: "h-11 flex-1 sm:flex-none",
+							disabled: !canBuy,
+							onClick: () => {
+								api?.buySkill(sel);
+							},
+							children: owned.has(sel) ? "Online" : canBuy ? `Forge · ${def.cost}` : def.cost === 0 ? "Core" : "Locked"
+						}), bay ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
+							size: "sm",
+							className: "h-11 flex-1 sm:flex-none",
+							onClick: () => api?.advanceWave(),
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { className: "size-4" }),
+								"Engage · Wave ",
+								briefing.next
+							]
+						}) : null]
 					})]
 				})
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", {
-				className: "flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "min-w-0",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "font-display text-base font-semibold",
-						children: def.name
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "text-sm text-muted",
-						children: def.desc
-					})]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-					disabled: !canBuy,
-					onClick: () => {
-						api?.buySkill(sel);
-					},
-					children: owned.has(sel) ? "Online" : canBuy ? `Forge · ${def.cost}` : def.cost === 0 ? "Core" : "Locked"
-				})]
-			})
-		]
-	}) });
+			]
+		})
+	});
 }
 function Hud() {
 	const phase = useGame((s) => s.phase);
 	const hud = useGame((s) => s.hud);
 	const api = useGame((s) => s.api);
 	if (phase === "title" || phase === "help" || phase === "scores") return null;
-	if (!(phase === "playing" || phase === "paused" || phase === "skills" || phase === "gameover")) return null;
+	if (!(phase === "playing" || phase === "paused" || phase === "skills" || phase === "forge" || phase === "gameover")) return null;
 	const hpPct = hud.maxHp ? hud.hp / hud.maxHp * 100 : 0;
 	const shPct = hud.maxShield ? hud.shield / hud.maxShield * 100 : 0;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -2432,13 +3302,41 @@ function Hud() {
 		]
 	});
 }
+function useTouchUi() {
+	const [on, setOn] = (0, import_react.useState)(() => {
+		if (typeof window === "undefined") return false;
+		return navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 48rem)").matches;
+	});
+	(0, import_react.useEffect)(() => {
+		const narrow = window.matchMedia("(max-width: 48rem)");
+		const coarse = window.matchMedia("(pointer: coarse)");
+		const sync = () => {
+			setOn(navigator.maxTouchPoints > 0 || coarse.matches || narrow.matches);
+		};
+		const onPtr = (e) => {
+			if (e.pointerType === "touch" || e.pointerType === "pen") setOn(true);
+		};
+		narrow.addEventListener("change", sync);
+		coarse.addEventListener("change", sync);
+		window.addEventListener("pointerdown", onPtr);
+		sync();
+		return () => {
+			narrow.removeEventListener("change", sync);
+			coarse.removeEventListener("change", sync);
+			window.removeEventListener("pointerdown", onPtr);
+		};
+	}, []);
+	return on;
+}
 function DualSticks() {
-	const layerRef = (0, import_react.useRef)(null);
 	const moveRef = (0, import_react.useRef)(null);
 	const aimRef = (0, import_react.useRef)(null);
 	const [moveKnob, setMoveKnob] = (0, import_react.useState)(null);
 	const [aimKnob, setAimKnob] = (0, import_react.useState)(null);
+	const canDash = useGame((s) => s.hud.canDash);
+	const dashCd = useGame((s) => s.hud.dashCd);
 	const R = 56;
+	const well = "max(6.5rem, calc(env(safe-area-inset-bottom) + 5rem))";
 	const vec = (ox, oy, cx, cy) => {
 		let x = cx - ox;
 		let y = cy - oy;
@@ -2452,11 +3350,55 @@ function DualSticks() {
 			y
 		};
 	};
-	const sideFor = (clientX) => {
-		const el = layerRef.current;
-		if (!el) return "left";
-		const rect = el.getBoundingClientRect();
-		return clientX < rect.left + rect.width / 2 ? "left" : "right";
+	const send = (side, x, y, on) => {
+		const mag = Math.hypot(x, y) / R;
+		const nx = mag < .16 ? 0 : x / R;
+		const ny = mag < .16 ? 0 : y / R;
+		if (side === "left") gameInput?.setTouchMove(nx, ny, on);
+		else gameInput?.setTouchAim(nx, ny, on);
+	};
+	const grab = (side, e) => {
+		const slot = side === "left" ? moveRef : aimRef;
+		if (slot.current) return;
+		e.preventDefault();
+		e.stopPropagation();
+		try {
+			e.currentTarget.setPointerCapture(e.pointerId);
+		} catch {}
+		slot.current = {
+			id: e.pointerId,
+			ox: e.clientX,
+			oy: e.clientY
+		};
+		const k = vec(e.clientX, e.clientY, e.clientX, e.clientY);
+		if (side === "left") setMoveKnob({
+			ox: e.clientX,
+			oy: e.clientY,
+			x: k.x,
+			y: k.y
+		});
+		else setAimKnob({
+			ox: e.clientX,
+			oy: e.clientY,
+			x: k.x,
+			y: k.y
+		});
+		send(side, 0, 0, true);
+	};
+	const movePtr = (e) => {
+		const apply = (slot, set, side) => {
+			if (slot.id !== e.pointerId) return;
+			const k = vec(slot.ox, slot.oy, e.clientX, e.clientY);
+			set({
+				ox: slot.ox,
+				oy: slot.oy,
+				x: k.x,
+				y: k.y
+			});
+			send(side, k.x, k.y, true);
+		};
+		if (moveRef.current) apply(moveRef.current, setMoveKnob, "left");
+		if (aimRef.current) apply(aimRef.current, setAimKnob, "right");
 	};
 	const release = (id) => {
 		if (moveRef.current?.id === id) {
@@ -2470,64 +3412,55 @@ function DualSticks() {
 			gameInput?.setTouchAim(0, 0, false);
 		}
 	};
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		ref: layerRef,
-		className: "pointer-events-auto absolute inset-x-0 bottom-0 top-[36%] z-20 touch-none",
-		onPointerDown: (e) => {
-			if (e.pointerType === "mouse") return;
-			const side = sideFor(e.clientX);
-			const slot = side === "left" ? moveRef : aimRef;
-			if (slot.current) return;
-			e.currentTarget.setPointerCapture(e.pointerId);
-			slot.current = {
-				id: e.pointerId,
-				ox: e.clientX,
-				oy: e.clientY
-			};
-			const k = vec(e.clientX, e.clientY, e.clientX, e.clientY);
-			if (side === "left") {
-				setMoveKnob({
-					ox: e.clientX,
-					oy: e.clientY,
-					x: k.x,
-					y: k.y
-				});
-				gameInput?.setTouchMove(0, 0, true);
-			} else {
-				setAimKnob({
-					ox: e.clientX,
-					oy: e.clientY,
-					x: k.x,
-					y: k.y
-				});
-				gameInput?.setTouchAim(0, 0, true);
-			}
-		},
-		onPointerMove: (e) => {
-			const apply = (slot, set, send) => {
-				if (slot.id !== e.pointerId) return;
-				const k = vec(slot.ox, slot.oy, e.clientX, e.clientY);
-				set({
-					ox: slot.ox,
-					oy: slot.oy,
-					x: k.x,
-					y: k.y
-				});
-				send(k.x / R, k.y / R, true);
-			};
-			if (moveRef.current) apply(moveRef.current, setMoveKnob, (x, y, on) => gameInput?.setTouchMove(x, y, on));
-			if (aimRef.current) apply(aimRef.current, setAimKnob, (x, y, on) => gameInput?.setTouchAim(x, y, on));
-		},
+	const zone = (side) => ({
+		onPointerDown: (e) => grab(side, e),
+		onPointerMove: movePtr,
 		onPointerUp: (e) => release(e.pointerId),
 		onPointerCancel: (e) => release(e.pointerId),
+		onLostPointerCapture: (e) => release(e.pointerId)
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "pointer-events-none absolute inset-0 z-20",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "pointer-events-none absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-6 font-display text-[10px] uppercase tracking-[0.2em] text-muted",
-				children: "Move"
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"data-touch-move": true,
+				"aria-label": "Move stick",
+				className: "pointer-events-auto absolute bottom-0 left-0 top-[38%] w-[48%] touch-none",
+				...zone("left")
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "pointer-events-none absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-6 font-display text-[10px] uppercase tracking-[0.2em] text-muted",
-				children: "Aim"
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"data-touch-aim": true,
+				"aria-label": "Aim stick",
+				className: "pointer-events-auto absolute bottom-0 right-0 top-[38%] w-[48%] touch-none",
+				...zone("right")
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(StickWell, {
+				label: "Move",
+				side: "left",
+				bottom: well,
+				knob: moveKnob ? {
+					x: moveKnob.x,
+					y: moveKnob.y
+				} : {
+					x: 0,
+					y: 0
+				},
+				active: !!moveKnob,
+				r: R
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(StickWell, {
+				label: "Aim",
+				side: "right",
+				bottom: well,
+				knob: aimKnob ? {
+					x: aimKnob.x,
+					y: aimKnob.y
+				} : {
+					x: 0,
+					y: 0
+				},
+				active: !!aimKnob,
+				r: R
 			}),
 			moveKnob ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StickGhost, {
 				knob: moveKnob,
@@ -2536,20 +3469,56 @@ function DualSticks() {
 			aimKnob ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StickGhost, {
 				knob: aimKnob,
 				r: R
+			}) : null,
+			canDash ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				"data-touch-dash": true,
+				"aria-label": "Dash",
+				disabled: dashCd > .05,
+				className: "pointer-events-auto absolute left-1/2 z-20 grid size-12 -translate-x-1/2 place-items-center rounded-full border border-border bg-surface/80 text-fg touch-none disabled:opacity-40",
+				style: { bottom: well },
+				onPointerDown: (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					if (dashCd > .05) return;
+					gameInput?.queueDash();
+				},
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronsUp, { className: "size-5" })
 			}) : null
+		]
+	});
+}
+function StickWell({ label, side, bottom, knob, active, r }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: cn("pointer-events-none absolute", side === "left" ? "left-3" : "right-3"),
+		style: {
+			bottom,
+			width: r * 2,
+			height: r * 2
+		},
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: cn("absolute inset-0 rounded-full border bg-surface/50", active ? "border-fg/40" : "border-border") }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "absolute left-1/2 top-1/2 size-11 rounded-full border border-border-strong bg-elevated",
+				style: { transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "absolute left-1/2 top-full mt-1 -translate-x-1/2 font-display text-[10px] uppercase tracking-[0.2em] text-muted",
+				children: label
+			})
 		]
 	});
 }
 function StickGhost({ knob, r }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "pointer-events-none fixed z-20 size-32 -translate-x-1/2 -translate-y-1/2",
+		className: "pointer-events-none fixed z-20 -translate-x-1/2 -translate-y-1/2",
 		style: {
 			left: knob.ox,
 			top: knob.oy,
 			width: r * 2,
 			height: r * 2
 		},
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 rounded-full border border-border bg-surface/45" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 rounded-full border border-border bg-surface/35" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 			className: "absolute left-1/2 top-1/2 size-11 rounded-full border border-border-strong bg-elevated",
 			style: { transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }
 		})]
@@ -2557,17 +3526,15 @@ function StickGhost({ knob, r }) {
 }
 function TouchControls() {
 	const playing = useGame((s) => s.phase) === "playing";
+	const show = useTouchUi();
 	(0, import_react.useEffect)(() => {
 		if (!playing) {
 			gameInput?.setTouchMove(0, 0, false);
 			gameInput?.setTouchAim(0, 0, false);
 		}
 	}, [playing]);
-	if (!playing) return null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: "pointer-events-none absolute inset-0 z-20 [@media(hover:hover)_and_(pointer:fine)]:hidden",
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DualSticks, {})
-	});
+	if (!playing || !show) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DualSticks, {});
 }
 function GameView() {
 	const canvasRef = (0, import_react.useRef)(null);
@@ -2580,7 +3547,8 @@ function GameView() {
 		return () => game.destroy();
 	}, []);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
-		className: "relative h-dvh w-full overflow-hidden bg-bg text-fg",
+		className: "relative h-dvh w-full touch-none overflow-hidden bg-bg text-fg",
+		style: { touchAction: "none" },
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("canvas", {
 				ref: canvasRef,
@@ -2592,7 +3560,7 @@ function GameView() {
 			phase === "title" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TitleScreen, {}) : null,
 			phase === "help" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HelpScreen, {}) : null,
 			phase === "paused" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseMenu, {}) : null,
-			phase === "skills" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SkillMap, {}) : null,
+			phase === "skills" || phase === "forge" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SkillMap, {}) : null,
 			phase === "gameover" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GameOver, {}) : null,
 			phase === "scores" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HighScores, {}) : null
 		]

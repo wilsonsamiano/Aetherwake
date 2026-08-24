@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { HudSnap, Phase, ScoreRow, SkillId } from "./types";
+import type { HudSnap, Phase, ScoreRow, SkillId, WaveBrief } from "./types";
 import { getScores, loadSettings, type Settings } from "./save";
 
 export type GameApi = {
@@ -9,6 +9,7 @@ export type GameApi = {
   openSkills: () => void;
   closeSkills: () => void;
   buySkill: (id: SkillId) => boolean;
+  advanceWave: () => void;
   submitName: (name: string) => void;
   toTitle: () => void;
   toScores: () => void;
@@ -34,6 +35,15 @@ const EMPTY_HUD: HudSnap = {
   dashCd: 0,
   unspent: 0,
   padOn: false,
+  canDash: false,
+};
+
+const EMPTY_BRIEF: WaveBrief = {
+  cleared: 0,
+  next: 1,
+  title: "",
+  blurb: "",
+  threat: "",
 };
 
 type GameStore = {
@@ -46,6 +56,9 @@ type GameStore = {
   lastWave: number;
   owned: SkillId[];
   api: GameApi | null;
+  menuIndex: number;
+  skillId: SkillId;
+  briefing: WaveBrief;
   setPhase: (phase: Phase) => void;
   setHud: (hud: HudSnap) => void;
   setApi: (api: GameApi | null) => void;
@@ -53,6 +66,9 @@ type GameStore = {
   setSettings: (settings: Settings) => void;
   setOwned: (owned: SkillId[]) => void;
   setQualify: (qualify: boolean, score: number, wave: number) => void;
+  setMenuIndex: (menuIndex: number) => void;
+  setSkillId: (skillId: SkillId) => void;
+  setBriefing: (briefing: WaveBrief) => void;
 };
 
 export const useGame = create<GameStore>((set) => ({
@@ -65,11 +81,17 @@ export const useGame = create<GameStore>((set) => ({
   lastWave: 0,
   owned: ["core"],
   api: null,
-  setPhase: (phase) => set({ phase }),
+  menuIndex: 0,
+  skillId: "core",
+  briefing: EMPTY_BRIEF,
+  setPhase: (phase) => set({ phase, menuIndex: 0 }),
   setHud: (hud) => set({ hud }),
   setApi: (api) => set({ api }),
   setScores: (scores) => set({ scores }),
   setSettings: (settings) => set({ settings }),
   setOwned: (owned) => set({ owned }),
   setQualify: (qualify, lastScore, lastWave) => set({ qualify, lastScore, lastWave }),
+  setMenuIndex: (menuIndex) => set({ menuIndex }),
+  setSkillId: (skillId) => set({ skillId }),
+  setBriefing: (briefing) => set({ briefing }),
 }));

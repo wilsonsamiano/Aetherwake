@@ -1,6 +1,17 @@
-export type Phase = "title" | "playing" | "paused" | "skills" | "gameover" | "scores" | "help";
+export type Phase = "title" | "playing" | "paused" | "skills" | "forge" | "gameover" | "scores" | "help";
 
-export type EnemyKind = "scout" | "fighter" | "bomber" | "cruiser";
+export type EnemyKind =
+  | "scout"
+  | "fighter"
+  | "bomber"
+  | "cruiser"
+  | "lance"
+  | "miner"
+  | "mine"
+  | "shard"
+  | "mite"
+  | "flak"
+  | "mortar";
 export type PickupKind = "multi" | "shield" | "speed" | "repair";
 
 export type Player = {
@@ -52,6 +63,8 @@ export type Enemy = {
   flash: number;
   knock: number;
   aim: number;
+  charge: number;
+  spin: number;
 };
 
 export type Bullet = {
@@ -141,6 +154,15 @@ export type HudSnap = {
   dashCd: number;
   unspent: number;
   padOn: boolean;
+  canDash: boolean;
+};
+
+export type WaveBrief = {
+  cleared: number;
+  next: number;
+  title: string;
+  blurb: string;
+  threat: string;
 };
 
 export type SkillId =

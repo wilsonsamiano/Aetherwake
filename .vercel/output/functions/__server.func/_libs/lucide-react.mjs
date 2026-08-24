@@ -82,6 +82,19 @@ var createLucideIcon = (iconName, iconNode) => {
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var ChevronsUp = createLucideIcon("chevrons-up", [["path", {
+	d: "m17 11-5-5-5 5",
+	key: "e8nh98"
+}], ["path", {
+	d: "m17 18-5-5-5 5",
+	key: "2avn1x"
+}]]);
+/**
+* @license lucide-react v0.510.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var Gamepad2 = createLucideIcon("gamepad-2", [
 	["line", {
 		x1: "6",
@@ -280,4 +293,4 @@ var Zap = createLucideIcon("zap", [["path", {
 	key: "1xq2db"
 }]]);
 //#endregion
-export { TriangleAlert as a, Pause as c, Gamepad2 as d, Volume2 as i, Map as l, X as n, Shield as o, VolumeX as r, Play as s, Zap as t, Gauge as u };
+export { TriangleAlert as a, Pause as c, Gamepad2 as d, ChevronsUp as f, Volume2 as i, Map as l, X as n, Shield as o, VolumeX as r, Play as s, Zap as t, Gauge as u };

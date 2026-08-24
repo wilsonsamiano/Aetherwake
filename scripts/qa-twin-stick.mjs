@@ -165,6 +165,64 @@ await mobile.getByRole("button", { name: "Engage" }).click();
 await mobile.waitForTimeout(400);
 const mobileText = await mobile.evaluate(() => document.body.innerText);
 console.log("mobile-labels", /Move/i.test(mobileText), /Aim/i.test(mobileText));
+if (!(await mobile.locator("[data-touch-move]").count()) || !(await mobile.locator("[data-touch-aim]").count())) {
+  console.log("FAIL mobile touch wells missing");
+  process.exitCode = 1;
+}
+const t0 = await mobile.evaluate(() => {
+  const t = window.__controlsTest;
+  return t ? { x: t.getX(), want: t.getWant?.() ?? 0 } : null;
+});
+const moveBox = await mobile.locator("[data-touch-move]").boundingBox();
+if (moveBox) {
+  const x = moveBox.x + moveBox.width * 0.5;
+  const y = moveBox.y + moveBox.height * 0.72;
+  await mobile.evaluate(
+    ({ x, y }) => {
+      const el = document.querySelector("[data-touch-move]");
+      const fire = (type, cx, cy, buttons) =>
+        el?.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            pointerId: 31,
+            pointerType: "touch",
+            isPrimary: true,
+            clientX: cx,
+            clientY: cy,
+            buttons,
+            button: 0,
+          }),
+        );
+      fire("pointerdown", x, y, 1);
+      fire("pointermove", x - 56, y, 1);
+    },
+    { x, y },
+  );
+  await mobile.waitForTimeout(420);
+  const t1 = await mobile.evaluate(() => {
+    const t = window.__controlsTest;
+    return t ? { x: t.getX() } : null;
+  });
+  await mobile.evaluate(() => {
+    document.querySelector("[data-touch-move]")?.dispatchEvent(
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        composed: true,
+        pointerId: 31,
+        pointerType: "touch",
+        buttons: 0,
+      }),
+    );
+  });
+  const dx = (t1?.x ?? 0) - (t0?.x ?? 0);
+  console.log("touch-strafe", dx);
+  if (!(dx < -8)) {
+    console.log("FAIL left touch stick did not strafe left");
+    process.exitCode = 1;
+  }
+}
 await mobile.screenshot({ path: `${out}/twin-mobile.png` });
 await mobile.close();
 

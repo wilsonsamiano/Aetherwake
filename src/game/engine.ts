@@ -1,8 +1,9 @@
 import { sfx, unlockAudio, setMuted, resumeAudio } from "./audio";
 import { Input, type InputState } from "./input";
-import { applyOwnedToPlayer, isAvailable, SKILL_BY_ID, type SkillDef } from "./skills";
+import { applyOwnedToPlayer, isAvailable, SKILL_BY_ID, SKILLS, type SkillDef } from "./skills";
 import { loadAtlas, drawFrame, type Atlas } from "./sprites";
 import { useGame } from "./store";
+import { waveSpec } from "./waves";
 import { getScores, qualifies, saveSettings, submitScore } from "./save";
 import type {
   Bullet,
@@ -23,15 +24,32 @@ import type {
 const STEP = 1 / 60;
 const MAX_DT = 0.1;
 const PAD = 28;
-const ENEMY_CAP = 72;
-const BULLET_CAP = 220;
+const ENEMY_CAP = 96;
+const BULLET_CAP = 280;
 const PART_CAP = 420;
 
-const KIND: Record<EnemyKind, { hp: number; spd: number; r: number; value: number; fire: number; frame: number }> = {
-  scout: { hp: 2, spd: 155, r: 14, value: 100, fire: 0, frame: 0 },
-  fighter: { hp: 5, spd: 100, r: 18, value: 250, fire: 1.55, frame: 1 },
-  bomber: { hp: 11, spd: 72, r: 22, value: 420, fire: 2.1, frame: 2 },
-  cruiser: { hp: 48, spd: 46, r: 36, value: 1600, fire: 1.05, frame: 3 },
+type KindSpec = {
+  hp: number;
+  spd: number;
+  r: number;
+  value: number;
+  fire: number;
+  frame: number;
+  color: string;
+};
+
+const KIND: Record<EnemyKind, KindSpec> = {
+  scout: { hp: 2, spd: 155, r: 14, value: 100, fire: 0, frame: 0, color: "#c56b6b" },
+  fighter: { hp: 5, spd: 100, r: 18, value: 250, fire: 1.55, frame: 1, color: "#c56b6b" },
+  bomber: { hp: 11, spd: 72, r: 22, value: 420, fire: 2.1, frame: 2, color: "#c56b6b" },
+  cruiser: { hp: 48, spd: 46, r: 36, value: 1600, fire: 1.05, frame: 3, color: "#c56b6b" },
+  lance: { hp: 7, spd: 78, r: 16, value: 340, fire: 0, frame: -1, color: "#e8eaef" },
+  miner: { hp: 9, spd: 62, r: 18, value: 380, fire: 2.35, frame: -1, color: "#7dba9a" },
+  mine: { hp: 3, spd: 0, r: 11, value: 40, fire: 0, frame: -1, color: "#c56b6b" },
+  shard: { hp: 4, spd: 120, r: 13, value: 180, fire: 0, frame: -1, color: "#8eb8c8" },
+  mite: { hp: 1, spd: 190, r: 8, value: 40, fire: 0, frame: -1, color: "#8eb8c8" },
+  flak: { hp: 6, spd: 128, r: 16, value: 280, fire: 1.35, frame: -1, color: "#c56b6b" },
+  mortar: { hp: 10, spd: 58, r: 20, value: 400, fire: 2.4, frame: -1, color: "#c56b6b" },
 };
 
 const PICK_FRAME: Record<PickupKind, number> = { multi: 0, shield: 1, speed: 2, repair: 3 };
@@ -70,7 +88,7 @@ export class Game {
   phase: Phase = "title";
   player!: Player;
   enemies = pool(ENEMY_CAP, (): Enemy => ({
-    alive: false, kind: "scout", x: 0, y: 0, vx: 0, vy: 0, hp: 0, maxHp: 1, r: 12, value: 0, fireCd: 0, flash: 0, knock: 0, aim: 0,
+    alive: false, kind: "scout", x: 0, y: 0, vx: 0, vy: 0, hp: 0, maxHp: 1, r: 12, value: 0, fireCd: 0, flash: 0, knock: 0, aim: 0, charge: 0, spin: 0,
   }));
   bullets = pool(BULLET_CAP, (): Bullet => ({
     alive: false, friendly: true, x: 0, y: 0, vx: 0, vy: 0, r: 4, dmg: 1, ttl: 0, pierce: 0, homing: 0, rot: 0,
@@ -91,6 +109,11 @@ export class Game {
   comboT = 0;
   waveWait = 0;
   inWave = false;
+  clearing = false;
+  clearT = 0;
+  clearDur = 3.2;
+  clearBonus = 1;
+  timeScale = 1;
   banner = "";
   bannerT = 0;
   trauma = 0;
@@ -153,6 +176,7 @@ export class Game {
         this.phase === "title" ||
         this.phase === "paused" ||
         this.phase === "skills" ||
+        this.phase === "forge" ||
         this.phase === "scores" ||
         this.phase === "help" ||
         this.phase === "gameover";
@@ -196,16 +220,19 @@ export class Game {
         if (this.phase === "playing") this.setPhase("paused");
       },
       openSkills: () => {
+        if (this.clearing) return;
         if (this.phase === "playing" || this.phase === "paused") {
           this.fromPause = this.phase === "paused";
           this.setPhase("skills");
         }
       },
       closeSkills: () => {
+        if (this.phase === "forge") return;
         if (this.wave === 0) this.setPhase("title");
         else this.setPhase(this.fromPause ? "paused" : "playing");
       },
       buySkill: (id) => this.buySkill(id),
+      advanceWave: () => this.advanceWave(),
       submitName: (name) => this.submitName(name),
       toTitle: () => {
         this.clearCombat();
@@ -234,11 +261,23 @@ export class Game {
     getSpeed: () => Math.hypot(this.player.vx, this.player.vy),
     getX: () => this.player.x,
     getY: () => this.player.y,
+    getWave: () => this.wave,
+    getPhase: () => this.phase,
+    getLive: () => this.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0),
+    getClearing: () => this.clearing,
     setKeys: (codes: string[]) => this.input.setKeys(codes),
     setSteer: (v: number) => {
       if (v > 0.2) this.input.setKeys(["KeyA"]);
       else if (v < -0.2) this.input.setKeys(["KeyD"]);
       else this.input.setKeys([]);
+    },
+    skipWave: () => {
+      for (const e of this.enemies) e.alive = false;
+      if (this.phase === "playing" || this.clearing) this.finishWave(true);
+    },
+    holdClear: () => {
+      for (const e of this.enemies) e.alive = false;
+      if (this.phase === "playing" || this.clearing) this.finishWave(false);
     },
   };
 
@@ -262,13 +301,17 @@ export class Game {
     this.combo = 0;
     this.comboT = 0;
     this.trauma = 0;
+    this.clearing = false;
+    this.clearT = 0;
+    this.timeScale = 1;
     this.clearCombat();
     this.resetPlayer(true);
     this.input.clearPointerAim();
+    useGame.getState().setOwned(["core"]);
+    useGame.getState().setSkillId("core");
+    useGame.getState().setQualify(false, 0, 0);
     this.setPhase("playing");
     this.nextWave();
-    useGame.getState().setOwned(["core"]);
-    useGame.getState().setQualify(false, 0, 0);
   }
 
   private submitName(name: string) {
@@ -362,6 +405,9 @@ export class Game {
     for (const m of this.muzzles) m.alive = false;
     this.inWave = false;
     this.waveWait = 0;
+    this.clearing = false;
+    this.clearT = 0;
+    this.timeScale = 1;
   }
 
   private resize() {
@@ -388,39 +434,229 @@ export class Game {
   }
 
   private handlePhaseInput(a: InputState) {
+    if (a.mute) {
+      const cur = useGame.getState().settings;
+      this.apiHandle?.setSettings({ mute: !cur.mute });
+    }
+    if (this.phase === "forge") {
+      if (a.menuDX || a.menuDY) this.navSkills(a.menuDX, a.menuDY);
+      if (a.confirm) {
+        const id = useGame.getState().skillId;
+        if (!this.buySkill(id)) this.advanceWave();
+      }
+      return;
+    }
+    if (a.skills) {
+      if (!this.clearing && (this.phase === "playing" || this.phase === "paused")) {
+        this.fromPause = this.phase === "paused";
+        this.setPhase("skills");
+      }
+    }
     if (a.pause) {
       if (this.phase === "title") this.startRun();
       else if (this.phase === "playing") this.setPhase("paused");
       else if (this.phase === "paused") this.setPhase("playing");
       else if (this.phase === "skills") this.setPhase(this.fromPause ? "paused" : "playing");
       else if (this.phase === "help" || this.phase === "scores") this.setPhase("title");
+      else if (this.phase === "gameover") this.toTitleSafe();
     }
-    if (a.confirm) {
-      if (this.phase === "title" || this.phase === "help" || this.phase === "scores") this.startRun();
-      else if (this.phase === "paused") this.setPhase("playing");
-      else if (this.phase === "gameover" && !useGame.getState().qualify) this.startRun();
+    if (a.back) {
+      if (this.phase === "paused") this.setPhase("playing");
+      else if (this.phase === "skills") this.setPhase(this.fromPause ? "paused" : "playing");
+      else if (this.phase === "help" || this.phase === "scores") this.setPhase("title");
+      else if (this.phase === "gameover") this.toTitleSafe();
+    }
+    if (this.phase !== "playing") {
+      if (a.menuDX || a.menuDY) this.nudgeMenu(a.menuDX, a.menuDY);
+      if (a.confirm) this.activateMenu();
+    }
+  }
+
+  private toTitleSafe() {
+    this.clearCombat();
+    this.wave = 0;
+    this.setPhase("title");
+  }
+
+  private menuLen() {
+    switch (this.phase) {
+      case "title":
+        return 3;
+      case "paused":
+        return 5;
+      case "help":
+      case "scores":
+        return 1;
+      case "gameover":
+        return useGame.getState().qualify ? 1 : 3;
+      default:
+        return 0;
+    }
+  }
+
+  private nudgeMenu(dx: number, dy: number) {
+    if (this.phase === "skills" || this.phase === "forge") {
+      this.navSkills(dx, dy);
+      return;
+    }
+    const n = this.menuLen();
+    if (n <= 0) return;
+    const step = dy !== 0 ? dy : dx;
+    if (!step) return;
+    const cur = useGame.getState().menuIndex;
+    useGame.getState().setMenuIndex((cur + step + n * 8) % n);
+  }
+
+  private navSkills(dx: number, dy: number) {
+    const id = useGame.getState().skillId;
+    const cur = SKILL_BY_ID[id];
+    let best: SkillId | null = null;
+    let bestScore = Infinity;
+    const nd = Math.hypot(dx, dy) || 1;
+    const ux = dx / nd;
+    const uy = dy / nd;
+    for (const s of SKILLS) {
+      if (s.id === id) continue;
+      const vx = s.x - cur.x;
+      const vy = s.y - cur.y;
+      const mag = Math.hypot(vx, vy) || 1;
+      const dot = (vx / mag) * ux + (vy / mag) * uy;
+      if (dot < 0.28) continue;
+      const score = mag / dot;
+      if (score < bestScore) {
+        bestScore = score;
+        best = s.id;
+      }
+    }
+    if (best) useGame.getState().setSkillId(best);
+  }
+
+  private activateMenu() {
+    const i = useGame.getState().menuIndex;
+    if (this.phase === "title") {
+      if (i === 1) this.setPhase("help");
+      else if (i === 2) this.setPhase("scores");
+      else this.startRun();
+      return;
+    }
+    if (this.phase === "paused") {
+      if (i === 1) {
+        this.fromPause = true;
+        this.setPhase("skills");
+      } else if (i === 2) {
+        this.apiHandle?.setSettings({ mute: !useGame.getState().settings.mute });
+      } else if (i === 3) {
+        this.apiHandle?.setSettings({ shake: !useGame.getState().settings.shake });
+      } else if (i === 4) {
+        this.toTitleSafe();
+      } else {
+        this.setPhase("playing");
+      }
+      return;
+    }
+    if (this.phase === "help" || this.phase === "scores") {
+      this.setPhase("title");
+      return;
+    }
+    if (this.phase === "gameover") {
+      if (useGame.getState().qualify) this.submitName("Pilot");
+      else if (i === 1) this.setPhase("scores");
+      else if (i === 2) this.toTitleSafe();
+      else this.startRun();
+      return;
+    }
+    if (this.phase === "skills") {
+      this.buySkill(useGame.getState().skillId);
+    }
+  }
+
+  private advanceWave() {
+    if (this.phase !== "forge") return;
+    this.input.clearPointerAim();
+    for (const b of this.bullets) b.alive = false;
+    this.setPhase("playing");
+    this.nextWave();
+  }
+
+  private openForgeBay() {
+    const next = this.wave + 1;
+    const spec = waveSpec(next);
+    useGame.getState().setBriefing({
+      cleared: this.wave,
+      next,
+      title: spec.title,
+      blurb: spec.blurb,
+      threat: spec.threat,
+    });
+    this.fromPause = false;
+    this.clearing = false;
+    this.clearT = 0;
+    this.timeScale = 1;
+    this.hitstop = 0;
+    let pick: SkillId = useGame.getState().skillId;
+    for (const s of SKILLS) {
+      if (!this.owned.has(s.id) && isAvailable(s.id, this.owned)) {
+        pick = s.id;
+        break;
+      }
+    }
+    useGame.getState().setSkillId(pick);
+    this.setPhase("forge");
+  }
+
+  private finishWave(immediate: boolean) {
+    if (this.phase === "forge" || this.phase === "skills" || this.phase === "gameover") return;
+    if (!this.inWave && !this.clearing) return;
+
+    if (this.inWave) {
+      this.inWave = false;
+      const bonus = this.wave % 5 === 0 ? 2 : 1;
+      this.clearBonus = bonus;
+      this.forge += bonus;
+      this.score += this.wave * 500;
+      this.float(this.player.x, this.player.y - 30, bonus > 1 ? "FORGE +2" : "FORGE +1", "#8eb8c8");
+      sfx("wave");
+      this.publishHud();
+    }
+
+    if (immediate || this.reduced) {
+      this.clearing = false;
+      this.clearT = 0;
+      this.timeScale = 1;
+      this.banner = this.clearBonus > 1 ? "Wave cleared · Forge +2" : "Wave cleared · Forge +1";
+      this.bannerT = 1.4;
+      this.openForgeBay();
+      return;
+    }
+
+    this.clearing = true;
+    this.clearT = 0;
+    this.clearDur = 3.2;
+    this.timeScale = 0.14;
+    this.hitstop = Math.max(this.hitstop, 0.22);
+    this.trauma = Math.min(1, this.trauma + 0.42);
+    this.banner = "";
+    this.bannerT = 0;
+    this.input.rumble(0.4, 0.75, 200);
+    for (const b of this.bullets) {
+      if (!b.friendly) b.ttl = Math.min(b.ttl, 0.55);
     }
   }
 
   private nextWave() {
     this.wave += 1;
     this.inWave = true;
-    this.waveWait = 2.4;
-    this.banner = this.wave % 5 === 0 ? `Cruiser inbound · Wave ${this.wave}` : `Wave ${this.wave}`;
-    this.bannerT = 2.1;
+    this.waveWait = 0;
+    const spec = waveSpec(this.wave);
+    this.banner = `Wave ${this.wave} · ${spec.title}`;
+    this.bannerT = 2.4;
     sfx("wave");
-    const n = this.wave;
     let spawned = 0;
-    const spawn = (kind: EnemyKind, count: number) => {
-      for (let i = 0; i < count; i++) {
-        if (this.spawnEnemy(kind)) spawned += 1;
+    for (const row of spec.spawns) {
+      for (let i = 0; i < row.n; i++) {
+        if (this.spawnEnemy(row.kind)) spawned += 1;
       }
-    };
-    spawn("scout", 3 + n);
-    spawn("fighter", Math.max(0, n - 1));
-    spawn("bomber", Math.max(0, Math.floor((n - 3) / 2)));
-    if (n % 5 === 0) spawn("cruiser", 1);
-    if (n >= 8) spawn("fighter", Math.floor(n / 4));
+    }
     if (spawned === 0) {
       this.spawnEnemy("scout");
       this.spawnEnemy("scout");
@@ -428,9 +664,6 @@ export class Game {
   }
 
   private spawnEnemy(kind: EnemyKind): boolean {
-    const e = this.enemies.find((x) => !x.alive);
-    if (!e) return false;
-    const spec = KIND[kind];
     const edge = (Math.random() * 4) | 0;
     let x = 0;
     let y = 0;
@@ -453,20 +686,30 @@ export class Game {
       x = this.player.x + (dx >= 0 ? -220 : 220);
       y = rand(40, this.h - 40);
     }
+    return this.placeEnemy(kind, x, y);
+  }
+
+  private placeEnemy(kind: EnemyKind, x: number, y: number): boolean {
+    const e = this.enemies.find((q) => !q.alive);
+    if (!e) return false;
+    const spec = KIND[kind];
     e.alive = true;
     e.kind = kind;
     e.x = x;
     e.y = y;
     e.vx = 0;
     e.vy = 0;
-    e.hp = spec.hp + Math.floor(this.wave * (kind === "cruiser" ? 2.2 : 0.35));
+    const hpScale = kind === "cruiser" ? 2.2 : kind === "mite" || kind === "mine" ? 0 : 0.35;
+    e.hp = spec.hp + Math.floor(this.wave * hpScale);
     e.maxHp = e.hp;
     e.r = spec.r;
     e.value = spec.value;
-    e.fireCd = rand(0.4, spec.fire || 1);
+    e.fireCd = kind === "mine" ? 0 : rand(0.3, spec.fire || 1.2);
     e.flash = 0;
     e.knock = 0;
     e.aim = Math.atan2(this.player.y - y, this.player.x - x);
+    e.charge = kind === "mine" ? rand(0.4, 1.2) : 0;
+    e.spin = Math.random() * Math.PI * 2;
     return true;
   }
 
@@ -557,6 +800,28 @@ export class Game {
   }
 
   private step(dt: number, a: InputState) {
+    if (this.clearing) {
+      this.clearT += dt;
+      const u = clamp(this.clearT / this.clearDur, 0, 1);
+      const hold = 0.3;
+      const rest = (u - hold) / (1 - hold);
+      this.timeScale =
+        u < hold ? 0.12 : 0.12 + (1 - Math.pow(1 - clamp(rest, 0, 1), 3)) * 0.7;
+      if (this.clearT >= this.clearDur) {
+        this.clearing = false;
+        this.timeScale = 1;
+        this.openForgeBay();
+        return;
+      }
+      dt *= this.timeScale;
+      this.player.invuln = Math.max(this.player.invuln, 0.2);
+      for (const b of this.bullets) {
+        if (!b.friendly) b.ttl = Math.min(b.ttl, 0.4);
+      }
+    } else {
+      this.timeScale = 1;
+    }
+
     this.t += dt;
     const p = this.player;
 
@@ -692,56 +957,7 @@ export class Game {
     const p = this.player;
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      const spec = KIND[e.kind];
-      const dx = p.x - e.x;
-      const dy = p.y - e.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      let tx = dx / dist;
-      let ty = dy / dist;
-      if (e.kind === "cruiser" && dist < 180) {
-        tx = -ty;
-        ty = dx / dist;
-      }
-      for (const o of this.enemies) {
-        if (!o.alive || o === e) continue;
-        const sx = e.x - o.x;
-        const sy = e.y - o.y;
-        const sd = Math.hypot(sx, sy);
-        if (sd > 0 && sd < e.r + o.r + 10) {
-          tx += (sx / sd) * 0.7;
-          ty += (sy / sd) * 0.7;
-        }
-      }
-      const tn = Math.hypot(tx, ty) || 1;
-      const spd = spec.spd * (1 + this.wave * 0.03);
-      e.vx = (tx / tn) * spd;
-      e.vy = (ty / tn) * spd;
-      if (e.knock > 0) {
-        e.x += e.vx * dt * 0.2;
-        e.y += e.vy * dt * 0.2;
-        e.knock -= dt;
-      } else {
-        e.x += e.vx * dt;
-        e.y += e.vy * dt;
-      }
-      e.aim = Math.atan2(dy, dx);
-      if (e.flash > 0) e.flash -= dt;
-      if (spec.fire > 0) {
-        e.fireCd -= dt;
-        if (e.fireCd <= 0 && dist < 560 && p.deadT <= 0) {
-          e.fireCd = spec.fire * (e.kind === "cruiser" ? 1 : 1 + Math.random() * 0.2);
-          const ang = e.aim;
-          if (e.kind === "bomber") {
-            for (const off of [-0.22, 0, 0.22]) this.fireBullet(e.x, e.y, ang + off, 240, false, 1, 5, 2.4);
-          } else if (e.kind === "cruiser") {
-            this.fireBullet(e.x, e.y, ang, 280, false, 1, 6, 2.6);
-            this.fireBullet(e.x, e.y, ang + 0.18, 260, false, 1, 5, 2.4);
-            this.fireBullet(e.x, e.y, ang - 0.18, 260, false, 1, 5, 2.4);
-          } else {
-            this.fireBullet(e.x, e.y, ang, 270, false, 1, 4.5, 2.2);
-          }
-        }
-      }
+      this.stepEnemy(e, dt);
     }
 
     for (const b of this.bullets) {
@@ -798,6 +1014,151 @@ export class Game {
     }
   }
 
+  private stepEnemy(e: Enemy, dt: number) {
+    const p = this.player;
+    const spec = KIND[e.kind];
+    if (e.flash > 0) e.flash -= dt;
+    if (e.knock > 0) e.knock -= dt;
+    e.spin += dt;
+    if (e.fireCd > 0) e.fireCd -= dt;
+
+    const dx = p.x - e.x;
+    const dy = p.y - e.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ux = dx / dist;
+    const uy = dy / dist;
+
+    if (e.kind === "mine") {
+      e.vx *= Math.exp(-3 * dt);
+      e.vy *= Math.exp(-3 * dt);
+      e.x += e.vx * dt;
+      e.y += e.vy * dt;
+      e.charge += dt;
+      if (e.charge >= 4.2 || dist < 40) this.killEnemy(e);
+      return;
+    }
+
+    let tx = ux;
+    let ty = uy;
+    let spd = spec.spd;
+
+    if (e.kind === "lance") {
+      if (e.charge > 0) {
+        spd *= 0.18;
+        e.charge += dt;
+        if (e.charge >= 1.08) {
+          this.fireBullet(e.x + Math.cos(e.aim) * e.r, e.y + Math.sin(e.aim) * e.r, e.aim, 820, false, 2, 4.6, 0.95);
+          this.muzzle(e.x, e.y, e.aim);
+          sfx("shoot");
+          e.charge = 0;
+          e.fireCd = 1.65;
+        }
+      } else {
+        if (dist < 240) {
+          tx = -ux;
+          ty = -uy;
+          spd *= 1.15;
+        } else if (dist > 420) {
+          tx = ux;
+          ty = uy;
+        } else {
+          tx = -uy;
+          ty = ux;
+          spd *= 0.85;
+        }
+        if (e.fireCd <= 0 && dist > 200 && dist < 460) {
+          e.charge = 0.001;
+          e.aim = Math.atan2(dy, dx);
+        }
+      }
+    } else if (e.kind === "miner") {
+      spd *= 0.9;
+      if (dist < 90) {
+        tx = -ux;
+        ty = -uy;
+      }
+      if (e.fireCd <= 0 && e.charge < 3 && dist > 70) {
+        if (this.placeEnemy("mine", e.x - ux * 18, e.y - uy * 18)) {
+          e.charge += 1;
+          e.fireCd = spec.fire;
+        }
+      }
+    } else if (e.kind === "flak") {
+      if (dist > 220) spd *= 1.12;
+      else {
+        spd *= 0.55;
+        tx = -uy;
+        ty = ux;
+      }
+      if (e.fireCd <= 0 && dist < 240) {
+        e.fireCd = spec.fire;
+        e.aim = Math.atan2(dy, dx);
+        for (const off of [-0.42, -0.22, 0, 0.22, 0.42]) {
+          this.fireBullet(e.x, e.y, e.aim + off, 390, false, 1, 3.1, 0.42);
+        }
+      }
+    } else if (e.kind === "mortar") {
+      if (dist < 160) {
+        tx = -ux;
+        ty = -uy;
+      }
+      if (e.fireCd <= 0) {
+        e.fireCd = spec.fire;
+        e.aim = Math.atan2(dy, dx);
+        this.fireBullet(e.x, e.y, e.aim, 175, false, 2, 7.2, 2.5);
+        this.muzzle(e.x, e.y, e.aim);
+      }
+    } else if (e.kind === "fighter" || e.kind === "bomber" || e.kind === "cruiser") {
+      if (e.kind === "cruiser" && dist < 140) {
+        tx = -ux;
+        ty = -uy;
+      }
+      if (e.fireCd <= 0 && spec.fire > 0) {
+        e.fireCd = spec.fire * (0.85 + Math.random() * 0.3);
+        e.aim = Math.atan2(dy, dx);
+        if (e.kind === "fighter") {
+          this.fireBullet(e.x, e.y, e.aim, 340, false, 1, 3.6, 1.15);
+        } else if (e.kind === "bomber") {
+          for (const off of [-0.22, 0, 0.22]) {
+            this.fireBullet(e.x, e.y, e.aim + off, 290, false, 1, 3.8, 1.2);
+          }
+        } else {
+          for (const off of [-0.18, -0.06, 0.06, 0.18]) {
+            this.fireBullet(e.x, e.y, e.aim + off, 300, false, 1, 4, 1.3);
+          }
+        }
+      }
+    } else if (e.kind === "mite") {
+      spd *= 1.08;
+    }
+
+    if (e.kind !== "lance" || e.charge <= 0) {
+      e.aim = Math.atan2(dy, dx);
+    }
+
+    const accel = 4.8;
+    const knockMul = e.knock > 0 ? 0.35 : 1;
+    e.vx += (tx * spd - e.vx) * Math.min(1, accel * dt) * knockMul;
+    e.vy += (ty * spd - e.vy) * Math.min(1, accel * dt) * knockMul;
+
+    for (const o of this.enemies) {
+      if (!o.alive || o === e || o.kind === "mine") continue;
+      const ox = e.x - o.x;
+      const oy = e.y - o.y;
+      const d2 = ox * ox + oy * oy;
+      const min = e.r + o.r + 10;
+      if (d2 < min * min && d2 > 0.25) {
+        const d = Math.sqrt(d2);
+        const push = ((min - d) / min) * 70;
+        e.vx += (ox / d) * push;
+        e.vy += (oy / d) * push;
+      }
+    }
+
+    e.x += e.vx * dt;
+    e.y += e.vy * dt;
+  }
+
   private stepPart(q: Particle, dt: number) {
     q.x += q.vx * dt;
     q.y += q.vy * dt;
@@ -831,7 +1192,7 @@ export class Game {
         const dy = b.y - p.y;
         if (dx * dx + dy * dy < (b.r + p.radius) * (b.r + p.radius)) {
           b.alive = false;
-          this.hurtPlayer(1);
+          this.hurtPlayer(b.dmg);
         }
       }
     }
@@ -842,6 +1203,10 @@ export class Game {
         const dx = e.x - p.x;
         const dy = e.y - p.y;
         if (dx * dx + dy * dy < (e.r + p.radius) * (e.r + p.radius)) {
+          if (e.kind === "mine") {
+            this.killEnemy(e);
+            continue;
+          }
           if (p.invuln <= 0) this.hurtPlayer(1);
           const n = Math.hypot(dx, dy) || 1;
           e.x += (dx / n) * 8;
@@ -892,22 +1257,34 @@ export class Game {
   }
 
   private killEnemy(e: Enemy) {
+    if (!e.alive) return;
+    const kind = e.kind;
+    const x = e.x;
+    const y = e.y;
     e.alive = false;
     this.combo = Math.min(8, this.combo + 1);
     this.comboT = 1.25;
-    const pts = e.value * this.combo;
+    const pts = kind === "mine" ? e.value : e.value * this.combo;
     this.score += pts;
-    this.float(e.x, e.y, `+${pts}`, "#e8eaef");
-    this.burst(e.x, e.y, e.kind === "cruiser" ? 36 : 16, e.kind === "cruiser" ? "#c56b6b" : "#d48a6a", 260);
-    this.trauma = Math.min(1, this.trauma + (e.kind === "cruiser" ? 0.55 : 0.18));
-    this.hitstop = e.kind === "cruiser" ? 0.07 : 0.028;
+    this.float(x, y, `+${pts}`, "#e8eaef");
+    this.burst(x, y, kind === "cruiser" ? 36 : kind === "mine" ? 24 : 16, kind === "cruiser" || kind === "mine" ? "#c56b6b" : "#d48a6a", 260);
+    this.trauma = Math.min(1, this.trauma + (kind === "cruiser" ? 0.55 : kind === "mine" ? 0.32 : 0.18));
+    this.hitstop = kind === "cruiser" ? 0.07 : 0.028;
     sfx("explode");
-    this.input.rumble(e.kind === "cruiser" ? 0.7 : 0.25, 0.5, e.kind === "cruiser" ? 140 : 40);
-    const drop = e.kind === "cruiser" ? 1 : e.kind === "bomber" ? 0.28 : 0.12;
-    if (Math.random() < drop) this.spawnPickup(e.x, e.y);
-    if (e.kind === "cruiser") {
-      this.spawnPickup(e.x + 16, e.y, "shield");
+    this.input.rumble(kind === "cruiser" ? 0.7 : 0.25, 0.5, kind === "cruiser" ? 140 : 40);
+    const drop = kind === "cruiser" ? 1 : kind === "bomber" || kind === "mortar" ? 0.28 : kind === "mine" || kind === "mite" ? 0.04 : 0.12;
+    if (Math.random() < drop) this.spawnPickup(x, y);
+    if (kind === "cruiser") {
+      this.spawnPickup(x + 16, y, "shield");
       this.forge += 1;
+    }
+    if (kind === "shard") {
+      const a = Math.random() * Math.PI * 2;
+      this.placeEnemy("mite", x + Math.cos(a) * 16, y + Math.sin(a) * 16);
+      this.placeEnemy("mite", x - Math.cos(a) * 16, y - Math.sin(a) * 16);
+    }
+    if (kind === "mine" && this.player.deadT <= 0 && Math.hypot(this.player.x - x, this.player.y - y) < 86) {
+      this.hurtPlayer(2);
     }
   }
 
@@ -939,24 +1316,12 @@ export class Game {
     }
   }
 
-  private waveLogic(dt: number) {
-    if (!this.inWave) {
-      this.waveWait -= dt;
-      if (this.waveWait <= 0) this.nextWave();
-      return;
-    }
+  private waveLogic(_dt: number) {
+    if (this.clearing) return;
+    if (!this.inWave) return;
     let live = 0;
     for (const e of this.enemies) if (e.alive) live++;
-    if (live === 0) {
-      this.inWave = false;
-      this.waveWait = 2.05;
-      this.forge += 1;
-      this.score += this.wave * 500;
-      this.banner = "Wave cleared · Forge +1";
-      this.bannerT = 2;
-      this.float(this.player.x, this.player.y - 30, "FORGE +1", "#8eb8c8");
-      sfx("wave");
-    }
+    if (live === 0) this.finishWave(false);
   }
 
   private gameOver() {
@@ -1010,6 +1375,7 @@ export class Game {
       dashCd: p.dashCd,
       unspent: this.forge,
       padOn: this.padOn || this.input.padLive,
+      canDash: this.canDash,
     };
     useGame.getState().setHud(snap);
   }
@@ -1062,9 +1428,21 @@ export class Game {
 
     for (const b of this.bullets) {
       if (!b.alive) continue;
+      const fat = !b.friendly && b.r >= 6;
       const sheet = b.friendly ? this.atlas?.boltPlayer : this.atlas?.boltEnemy;
       const frame = ((this.t * 12) | 0) % 4;
-      if (sheet) {
+      if (fat) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.fillStyle = "#c56b6b";
+        ctx.beginPath();
+        ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(232,234,239,0.55)";
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.restore();
+      } else if (sheet) {
         drawFrame(ctx, sheet, frame, b.x, b.y, b.friendly ? 18 : 16, b.friendly ? 28 : 22, b.rot + Math.PI / 2);
       } else {
         ctx.save();
@@ -1080,20 +1458,34 @@ export class Game {
       if (!e.alive) continue;
       const spec = KIND[e.kind];
       const size = spec.r * 2.6;
+      if (e.kind === "lance" && e.charge > 0.05) {
+        const pulse = 0.16 + e.charge * 0.72;
+        ctx.save();
+        ctx.strokeStyle = `rgba(232,234,239,${pulse})`;
+        ctx.lineWidth = 1.2 + e.charge * 2.4;
+        ctx.setLineDash([5, 7]);
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(e.x + Math.cos(e.aim) * 640, e.y + Math.sin(e.aim) * 640);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
       ctx.save();
       if (e.flash > 0) ctx.globalCompositeOperation = "lighter";
-      if (this.atlas?.enemies) {
-        drawFrame(ctx, this.atlas.enemies, spec.frame, e.x, e.y, size, size, e.aim + Math.PI / 2, e.flash > 0 ? 1 : 1);
+      if (spec.frame >= 0 && this.atlas?.enemies) {
+        drawFrame(ctx, this.atlas.enemies, spec.frame, e.x, e.y, size, size, e.aim + Math.PI / 2);
       } else {
-        this.drawPoly(ctx, e.x, e.y, e.aim, spec.r, "#c56b6b");
+        this.drawEnemyShape(ctx, e);
       }
       ctx.restore();
-      if (e.kind === "cruiser" || e.hp < e.maxHp) {
+      if (e.kind === "cruiser" || e.kind === "mine" || e.hp < e.maxHp) {
         const bw = spec.r * 2;
         ctx.fillStyle = "rgba(8,9,13,0.6)";
         ctx.fillRect(e.x - bw / 2, e.y - spec.r - 8, bw, 3);
-        ctx.fillStyle = "#c56b6b";
-        ctx.fillRect(e.x - bw / 2, e.y - spec.r - 8, bw * clamp(e.hp / e.maxHp, 0, 1), 3);
+        ctx.fillStyle = e.kind === "mine" ? "#8eb8c8" : "#c56b6b";
+        const frac = e.kind === "mine" ? clamp(1 - e.charge / 4.2, 0, 1) : clamp(e.hp / e.maxHp, 0, 1);
+        ctx.fillRect(e.x - bw / 2, e.y - spec.r - 8, bw * frac, 3);
       }
     }
 
@@ -1180,6 +1572,131 @@ export class Game {
       ctx.globalAlpha = 1;
     }
     ctx.restore();
+    this.drawClearing(ctx, w, h);
+  }
+
+  private drawClearing(ctx: CanvasRenderingContext2D, w: number, h: number) {
+    if (!this.clearing) return;
+    const u = clamp(this.clearT / this.clearDur, 0, 1);
+    const appear = clamp((u - 0.06) / 0.2, 0, 1);
+    const ease = 1 - Math.pow(1 - appear, 3);
+    const fadeHold = u < 0.82 ? 1 : 1 - (u - 0.82) / 0.18;
+    const alpha = ease * clamp(fadeHold, 0, 1);
+    const vig = Math.min(0.52, 0.18 + ease * 0.34);
+    ctx.fillStyle = `rgba(8,9,13,${vig})`;
+    ctx.fillRect(0, 0, w, h);
+
+    const ring = 1 - Math.pow(1 - clamp(u / 0.55, 0, 1), 2);
+    ctx.save();
+    ctx.strokeStyle = `rgba(142,184,200,${0.28 * (1 - ring)})`;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, 28 + ring * Math.max(w, h) * 0.58, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    const y = h * 0.42 + (1 - ease) * 22;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#8eb8c8";
+    ctx.font = "500 13px Oxanium, sans-serif";
+    ctx.fillText(`WAVE ${this.wave}`, w / 2, y - 28);
+    ctx.fillStyle = "#e8eaef";
+    const size = Math.round(clamp(w * 0.055, 28, 52));
+    ctx.font = `600 ${size}px Oxanium, sans-serif`;
+    ctx.fillText("WAKE CLEARED", w / 2, y);
+    ctx.fillStyle = "#8eb8c8";
+    ctx.font = "500 16px Oxanium, sans-serif";
+    ctx.fillText(this.clearBonus > 1 ? "Forge +2" : "Forge +1", w / 2, y + 32);
+    ctx.fillStyle = "#8b90a0";
+    ctx.font = "500 12px Oxanium, sans-serif";
+    ctx.fillText("Holding for the forge bay", w / 2, y + 56);
+    ctx.restore();
+  }
+
+  private drawEnemyShape(ctx: CanvasRenderingContext2D, e: Enemy) {
+    const spec = KIND[e.kind];
+    const r = spec.r;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.rotate(e.aim + Math.PI / 2);
+    ctx.fillStyle = spec.color;
+    ctx.strokeStyle = e.flash > 0 ? "#e8eaef" : "rgba(232,234,239,0.38)";
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    switch (e.kind) {
+      case "lance":
+        ctx.moveTo(0, -r * 1.45);
+        ctx.lineTo(r * 0.38, r * 0.7);
+        ctx.lineTo(0, r * 0.22);
+        ctx.lineTo(-r * 0.38, r * 0.7);
+        break;
+      case "miner":
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        break;
+      case "mine": {
+        const pulse = 1 + Math.sin(e.spin * 8 + e.charge * 4) * 0.12;
+        const rr = r * pulse;
+        ctx.arc(0, 0, rr * 0.62, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + e.spin;
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
+      case "shard":
+        ctx.moveTo(0, -r * 1.2);
+        ctx.lineTo(r * 0.7, 0);
+        ctx.lineTo(0, r * 0.9);
+        ctx.lineTo(-r * 0.7, 0);
+        break;
+      case "mite":
+        ctx.moveTo(0, -r * 1.1);
+        ctx.lineTo(r * 0.7, r * 0.7);
+        ctx.lineTo(0, r * 0.2);
+        ctx.lineTo(-r * 0.7, r * 0.7);
+        break;
+      case "flak":
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r * 1.05, r * 0.55);
+        ctx.lineTo(r * 0.3, r * 0.15);
+        ctx.lineTo(0, r * 0.75);
+        ctx.lineTo(-r * 0.3, r * 0.15);
+        ctx.lineTo(-r * 1.05, r * 0.55);
+        break;
+      case "mortar":
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+          const px = Math.cos(a) * r * 1.05;
+          const py = Math.sin(a) * r * 1.05;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        break;
+      default:
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r * 0.72, r * 0.7);
+        ctx.lineTo(0, r * 0.28);
+        ctx.lineTo(-r * 0.72, r * 0.7);
+        break;
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
   }
 
   private drawPoly(
@@ -1216,8 +1733,14 @@ declare global {
       getSpeed: () => number;
       getX: () => number;
       getY: () => number;
+      getWave?: () => number;
+      getPhase?: () => string;
+      getLive?: () => number;
+      getClearing?: () => boolean;
       setKeys?: (codes: string[]) => void;
       setSteer?: (v: number) => void;
+      skipWave?: () => void;
+      holdClear?: () => void;
     };
   }
 }

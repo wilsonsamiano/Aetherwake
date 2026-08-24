@@ -25,7 +25,7 @@ export function GameView() {
   }, []);
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-bg text-fg">
+    <main className="relative h-dvh w-full touch-none overflow-hidden bg-bg text-fg" style={{ touchAction: "none" }}>
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-none select-none"
@@ -36,7 +36,7 @@ export function GameView() {
       {phase === "title" ? <TitleScreen /> : null}
       {phase === "help" ? <HelpScreen /> : null}
       {phase === "paused" ? <PauseMenu /> : null}
-      {phase === "skills" ? <SkillMap /> : null}
+      {phase === "skills" || phase === "forge" ? <SkillMap /> : null}
       {phase === "gameover" ? <GameOver /> : null}
       {phase === "scores" ? <HighScores /> : null}
     </main>
