@@ -25,7 +25,11 @@ export function GameView() {
   }, []);
 
   return (
-    <main className="relative h-dvh w-full touch-none overflow-hidden bg-bg text-fg" style={{ touchAction: "none" }}>
+    <main
+      data-game-root
+      className="relative h-dvh w-full touch-none overflow-hidden bg-bg text-fg"
+      style={{ touchAction: "none" }}
+    >
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-none select-none"
