@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { gameInput } from "@/game/input";
 import { SKILL_BY_ID, SKILL_EDGES, SKILLS, isAvailable } from "@/game/skills";
 import { useGame } from "@/game/store";
+import { FullscreenButtons } from "@/components/fullscreen-ui";
 
 function Panel({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -61,38 +62,44 @@ function CoffeeLink({ className }: { className?: string }) {
 export function TitleScreen() {
   const api = useGame((s) => s.api);
   return (
-    <div className="absolute inset-0 z-20 flex flex-col justify-end p-4 pb-[max(5.5rem,env(safe-area-inset-bottom))] sm:pb-6">
-      <img
-        src="/title.jpg"
-        alt=""
-        width={1200}
-        height={630}
-        draggable={false}
-        decoding="async"
-        fetchPriority="high"
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center select-none"
-      />
-      <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent"
-        aria-hidden
-      />
+    <div className="absolute inset-0 z-20 flex min-h-0 flex-col">
+      {/* Art region grows; contain+top keeps full title lockup on tall phones */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <img
+          src="/title.jpg"
+          alt=""
+          width={1200}
+          height={630}
+          draggable={false}
+          decoding="async"
+          fetchPriority="high"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain object-top sm:object-cover sm:object-[center_center]"
+        />
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent sm:via-bg/55"
+          aria-hidden
+        />
+      </div>
       <h1 className="sr-only">Aetherwake</h1>
       <p className="sr-only">Forge the ship. Wake the void.</p>
-      <div className="pointer-events-auto relative mx-auto w-[min(440px,calc(100vw-2rem))] rounded-xl border border-border bg-surface/80 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
-        <div className="flex flex-col gap-3">
-          <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
-            <Play className="size-4" />
-            Engage
-          </Button>
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="ghost" onClick={() => api?.toHelp()}>
-              Briefing
+      <div className="pointer-events-auto relative z-10 mx-auto w-full max-w-[440px] shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:pb-6">
+        <div className="rounded-xl border border-border bg-surface/85 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+          <div className="flex flex-col gap-3">
+            <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
+              <Play className="size-4" />
+              Engage
             </Button>
-            <Button variant="ghost" onClick={() => api?.toScores()}>
-              Records
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="ghost" onClick={() => api?.toHelp()}>
+                Briefing
+              </Button>
+              <Button variant="ghost" onClick={() => api?.toScores()}>
+                Records
+              </Button>
+            </div>
+            <FullscreenButtons labeled className="w-full" />
+            <CoffeeLink />
           </div>
-          <CoffeeLink />
         </div>
       </div>
     </div>
@@ -120,6 +127,9 @@ export function HelpScreen() {
           </li>
           <li>
             <span className="text-fg">Touch</span> — left well strafes, right well aims. Auto-fire stays on. Blink dash is the pad between the wells. Pause and forge sit at the top.
+          </li>
+          <li>
+            <span className="text-fg">Full screen</span> — tap Full screen to fill the display. Esc or the same control exits.
           </li>
           <li>
             <span className="text-fg">Forge bay</span> — after every wave the bay holds. Spend forge on the constellation, then Engage the next hull. Each wake brings a new arm: ram probes, tracers, spread cones, splitters, cruisers, rails, mines, flak, mortars.
@@ -167,6 +177,7 @@ export function PauseMenu() {
             <Gauge className="size-4" />
             Shake {settings.shake ? "on" : "off"}
           </Button>
+          <FullscreenButtons labeled className="w-full" />
           <Button variant="ghost" onClick={() => api?.toTitle()}>
             Abandon run
           </Button>
