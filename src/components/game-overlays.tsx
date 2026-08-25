@@ -63,10 +63,10 @@ function CoffeeLink({ className }: { className?: string }) {
 export function TitleScreen() {
   const api = useGame((s) => s.api);
   return (
-    <div className="absolute inset-0 z-20 flex min-h-0 flex-col">
+    <div className="absolute inset-0 z-20 flex min-h-0 flex-col" aria-label="Aetherwake. Forge the ship. Wake the void.">
       <div className="absolute inset-0 overflow-hidden bg-bg">
         <img
-          src="/title-mobile.jpg"
+          src="/title-lockup.jpg"
           alt=""
           width={1080}
           height={1440}
@@ -86,16 +86,13 @@ export function TitleScreen() {
           className="pointer-events-none absolute inset-0 hidden h-full w-full select-none object-cover object-center sm:block"
         />
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] bg-gradient-to-t from-bg via-bg/70 to-transparent sm:h-1/3"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[22%] bg-gradient-to-t from-bg to-transparent sm:h-1/3"
           aria-hidden
         />
       </div>
       <div className="pointer-events-auto relative z-10 mt-auto mx-auto w-full max-w-[440px] shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:pb-6">
         <div className="rounded-xl border border-border bg-surface/90 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
           <div className="flex flex-col gap-3">
-            <p className="px-1 text-center font-display text-[clamp(1.15rem,5.2vw,1.55rem)] font-semibold leading-snug tracking-[0.08em] text-fg sm:hidden">
-              Forge the ship. Wake the void.
-            </p>
             <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
               <Play className="size-4" />
               Engage
