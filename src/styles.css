@@ -71,17 +71,10 @@ html.awake-fs [data-game-root] {
   background: var(--color-bg);
 }
 
-/* Title key art: always show full lockup on portrait/tall; cover only on wide landscape */
+/* Title key art is atmosphere only; wordmark is large HTML text */
 img[src="/title.jpg"] {
-  object-fit: contain !important;
-  object-position: center top !important;
-}
-
-@media (min-aspect-ratio: 1.55/1) {
-  img[src="/title.jpg"] {
-    object-fit: cover !important;
-    object-position: center center !important;
-  }
+  object-fit: cover !important;
+  object-position: center 32% !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
