@@ -1,13 +1,13 @@
-const CACHE = "aetherwake-v1";
+const CACHE = "aetherwake-v2";
 
 const PRECACHE = [
   "/",
   "/favicon.svg",
   "/manifest.webmanifest",
-  "/icon-180.png",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/icon-512-maskable.png",
+  "/aw-fighter-180.png",
+  "/aw-fighter-192.png",
+  "/aw-fighter-512.png",
+  "/aw-fighter-512-maskable.png",
   "/title.jpg",
   "/title-mobile.jpg",
   "/title-phone.jpg",
