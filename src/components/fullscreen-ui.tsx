@@ -16,8 +16,10 @@ export function FullscreenButtons({ labeled = false, className }: { labeled?: bo
       type="button"
       aria-label={on ? "Exit full screen" : "Full screen"}
       className={cn(
-        "pointer-events-auto grid place-items-center rounded-[12px] border border-border bg-surface/80 text-fg",
-        labeled ? "h-11 gap-2 px-3 font-display text-sm" : "size-11",
+        "pointer-events-auto place-items-center rounded-[12px] border border-border bg-surface/80 text-fg",
+        labeled
+          ? "inline-flex h-11 w-full items-center justify-center gap-2 px-3 font-display text-sm"
+          : "grid size-11",
         on && "border-fg/40",
         className,
       )}
