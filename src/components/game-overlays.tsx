@@ -303,6 +303,7 @@ export function SkillMap() {
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <FullscreenButtons />
             <p className="font-mono text-lg tabular-nums text-fg">
               <span className="text-muted">Forge </span>
               {forge}
@@ -477,6 +478,34 @@ export function Hud() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
+          <div className="pointer-events-auto flex gap-2">
+            {phase === "skills" || phase === "forge" ? null : <FullscreenButtons />}
+            {phase === "playing" ? (
+              <>
+                <button
+                  type="button"
+                  className="relative grid size-11 place-items-center rounded-[12px] border border-border bg-surface/80 text-fg"
+                  onClick={() => api?.openSkills()}
+                  aria-label="Open forge map"
+                >
+                  <MapIcon className="size-4" />
+                  {hud.unspent > 0 ? (
+                    <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-accent px-1 text-center font-mono text-[10px] leading-4 text-accent-fg">
+                      {hud.unspent}
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  className="grid size-11 place-items-center rounded-[12px] border border-border bg-surface/80 text-fg"
+                  onClick={() => api?.pause()}
+                  aria-label="Pause"
+                >
+                  <Pause className="size-4" />
+                </button>
+              </>
+            ) : null}
+          </div>
           <p className="rounded-[16px] border border-border bg-bg/55 px-3 py-2 font-mono text-base tabular-nums text-fg backdrop-blur-sm">
             W{hud.wave}
             {hud.combo > 1 ? <span className="ml-2 text-accent">x{hud.combo}</span> : null}
@@ -487,26 +516,6 @@ export function Hud() {
               </span>
             ) : null}
           </p>
-          {phase === "playing" ? (
-            <div className="pointer-events-auto flex gap-2">
-              <button
-                type="button"
-                className="grid size-11 place-items-center rounded-[12px] border border-border bg-surface/80 text-fg"
-                onClick={() => api?.openSkills()}
-                aria-label="Open forge map"
-              >
-                <MapIcon className="size-4" />
-              </button>
-              <button
-                type="button"
-                className="grid size-11 place-items-center rounded-[12px] border border-border bg-surface/80 text-fg"
-                onClick={() => api?.pause()}
-                aria-label="Pause"
-              >
-                <Pause className="size-4" />
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
       {hud.banner ? (
