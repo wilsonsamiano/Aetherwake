@@ -1,3 +1,5 @@
+import { exitFullscreen, isFullscreen } from "@/lib/fullscreen";
+
 export let gameInput: Input | null = null;
 
 export type InputState = {
@@ -357,7 +359,14 @@ export class Input {
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     if (GAME_KEYS.has(e.code)) e.preventDefault();
     this.keys.add(e.code);
-    if (e.code === "Escape" || e.code === "KeyP") this.pauseQueued = true;
+    if (e.code === "Escape") {
+      if (isFullscreen()) {
+        exitFullscreen();
+        return;
+      }
+      this.pauseQueued = true;
+    }
+    if (e.code === "KeyP") this.pauseQueued = true;
     if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "Space") this.dashQueued = true;
     if (e.code === "Enter") this.confirmQueued = true;
     if (e.code === "Backspace") this.backQueued = true;
