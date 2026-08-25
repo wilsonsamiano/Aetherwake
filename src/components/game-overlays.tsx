@@ -63,8 +63,17 @@ export function TitleScreen() {
   const api = useGame((s) => s.api);
   return (
     <div className="absolute inset-0 z-20 flex min-h-0 flex-col">
-      {/* Art fills the frame; HTML lockup stays readable on narrow phones */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden bg-bg">
+        <img
+          src="/title-mobile.jpg"
+          alt=""
+          width={1080}
+          height={1440}
+          draggable={false}
+          decoding="async"
+          fetchPriority="high"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain object-top sm:hidden"
+        />
         <img
           src="/title.jpg"
           alt=""
@@ -73,22 +82,14 @@ export function TitleScreen() {
           draggable={false}
           decoding="async"
           fetchPriority="high"
-          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-[center_32%]"
+          className="pointer-events-none absolute inset-0 hidden h-full w-full select-none object-cover object-center sm:block"
         />
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/55 via-bg/25 to-bg"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] bg-gradient-to-t from-bg via-bg/70 to-transparent sm:h-1/3"
           aria-hidden
         />
-        <div className="pointer-events-none absolute inset-x-0 top-[max(1.5rem,env(safe-area-inset-top))] flex flex-col items-center px-4 pt-6 text-center sm:top-[12%] sm:pt-0">
-          <h1 className="font-display text-[clamp(2.5rem,12vw,4.75rem)] font-semibold leading-[0.95] tracking-[0.02em] text-fg drop-shadow-[0_4px_28px_rgba(0,0,0,0.9)]">
-            Aetherwake
-          </h1>
-          <p className="mt-3 max-w-[18rem] font-display text-[clamp(0.8125rem,3.4vw,1.05rem)] leading-snug tracking-[0.08em] text-fg/80 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:max-w-none">
-            Forge the ship. Wake the void.
-          </p>
-        </div>
       </div>
-      <div className="pointer-events-auto relative z-10 mx-auto w-full max-w-[440px] shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:pb-6">
+      <div className="pointer-events-auto relative z-10 mt-auto mx-auto w-full max-w-[440px] shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:pb-6">
         <div className="rounded-xl border border-border bg-surface/90 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
           <div className="flex flex-col gap-3">
             <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
@@ -103,7 +104,7 @@ export function TitleScreen() {
                 Records
               </Button>
             </div>
-            <FullscreenButtons labeled className="w-full" />
+            <FullscreenButtons labeled />
             <CoffeeLink />
           </div>
         </div>
@@ -133,9 +134,6 @@ export function HelpScreen() {
           </li>
           <li>
             <span className="text-fg">Touch</span> — left well strafes, right well aims. Auto-fire stays on. Blink dash is the pad between the wells. Pause and forge sit at the top.
-          </li>
-          <li>
-            <span className="text-fg">Full screen</span> — tap Full screen to fill the display. Esc or the same control exits.
           </li>
           <li>
             <span className="text-fg">Forge bay</span> — after every wave the bay holds. Spend forge on the constellation, then Engage the next hull. Each wake brings a new arm: ram probes, tracers, spread cones, splitters, cruisers, rails, mines, flak, mortars.
@@ -183,7 +181,7 @@ export function PauseMenu() {
             <Gauge className="size-4" />
             Shake {settings.shake ? "on" : "off"}
           </Button>
-          <FullscreenButtons labeled className="w-full" />
+          <FullscreenButtons labeled />
           <Button variant="ghost" onClick={() => api?.toTitle()}>
             Abandon run
           </Button>
@@ -288,22 +286,22 @@ export function SkillMap() {
   const canBuy = avail && forge >= def.cost && def.cost > 0 && !owned.has(sel);
 
   return (
-    <Overlay className="p-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] sm:p-4">
+    <Overlay className="p-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-4">
       <div
         data-forge-panel
-        className="pointer-events-auto flex h-[min(36rem,calc(100dvh-7rem))] w-[min(48rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface/94 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:h-[min(38rem,calc(100dvh-1.75rem))]"
+        className="pointer-events-auto flex h-[min(40rem,calc(100dvh-1.25rem))] w-[min(48rem,calc(100vw-0.75rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface/96 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:h-[min(38rem,calc(100dvh-1.75rem))]"
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2 sm:px-4">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3 sm:px-4">
           <div className="min-w-0">
-            <p className="font-display text-[0.65rem] uppercase tracking-[0.2em] text-accent">
+            <p className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-accent">
               {bay ? `Wave ${briefing.cleared} cleared` : "Constellation"}
             </p>
-            <h2 className="truncate font-display text-base font-semibold leading-tight">
+            <h2 className="truncate font-display text-xl font-semibold leading-tight">
               {bay ? `Next · ${briefing.title}` : "Forge map"}
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <p className="font-mono text-sm tabular-nums text-fg">
+            <p className="font-mono text-lg tabular-nums text-fg">
               <span className="text-muted">Forge </span>
               {forge}
             </p>
@@ -320,14 +318,40 @@ export function SkillMap() {
           </div>
         </header>
         {bay ? (
-          <div className="shrink-0 border-b border-border px-3 py-1.5 sm:px-4">
-            <p className="truncate font-display text-[0.65rem] uppercase tracking-[0.18em] text-accent">
+          <div className="shrink-0 border-b border-border px-3 py-2 sm:px-4">
+            <p className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-accent">
               {briefing.threat}
-              <span className="ml-2 font-sans font-normal normal-case tracking-normal text-muted">{briefing.blurb}</span>
             </p>
+            <p className="mt-0.5 text-sm leading-snug text-muted sm:truncate">{briefing.blurb}</p>
           </div>
         ) : null}
-        <div data-forge-map className="relative min-h-0 flex-1 overflow-hidden">
+        <div data-forge-map className="min-h-0 flex-1 overflow-hidden p-2 sm:hidden">
+          <div className="grid h-full grid-cols-3 grid-rows-6 gap-1.5">
+            {SKILLS.map((s) => {
+              const isOwned = owned.has(s.id);
+              const isAvail = isAvailable(s.id, owned) || s.id === "core";
+              const selected = sel === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={cn(
+                    "flex min-h-0 flex-col items-center justify-center rounded-[12px] border px-1 font-display leading-tight",
+                    selected ? "border-fg bg-elevated text-fg" : "border-border bg-bg/50",
+                    !selected && (isOwned || isAvail ? "text-fg" : "text-subtle"),
+                  )}
+                  onClick={() => useGame.getState().setSkillId(s.id)}
+                >
+                  <span className="text-base font-semibold tracking-wide">{s.short}</span>
+                  <span className={cn("text-sm tabular-nums", isAvail && !isOwned ? "text-accent" : "text-muted")}>
+                    {s.id === "core" ? "core" : s.cost}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div data-forge-map className="relative hidden min-h-0 flex-1 overflow-hidden sm:block">
           <svg viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet" className="h-full w-full">
             {SKILL_EDGES.map(([a, b]) => {
               const na = SKILL_BY_ID[a];
@@ -341,7 +365,7 @@ export function SkillMap() {
                   x2={nb.x * 1000}
                   y2={nb.y * 500}
                   stroke={on ? "#8eb8c8" : "rgba(232,234,239,0.14)"}
-                  strokeWidth={on ? 2.2 : 1.1}
+                  strokeWidth={on ? 2.6 : 1.3}
                 />
               );
             })}
@@ -353,19 +377,19 @@ export function SkillMap() {
               const cy = s.y * 500;
               return (
                 <g key={s.id} transform={`translate(${cx} ${cy})`} className="cursor-pointer">
-                  <circle r={40} fill="transparent" onClick={() => useGame.getState().setSkillId(s.id)} />
+                  <circle r={48} fill="transparent" onClick={() => useGame.getState().setSkillId(s.id)} />
                   <circle
-                    r={selected ? 24 : 20}
+                    r={selected ? 28 : 24}
                     fill={isOwned ? "#8eb8c8" : isAvail ? "#1a1d27" : "#12141c"}
                     stroke={selected ? "#e8eaef" : isAvail ? "#8eb8c8" : "rgba(232,234,239,0.2)"}
-                    strokeWidth={selected ? 2.4 : 1.3}
+                    strokeWidth={selected ? 2.8 : 1.5}
                     onClick={() => useGame.getState().setSkillId(s.id)}
                   />
                   <text
                     textAnchor="middle"
-                    y={5}
+                    y={7}
                     fill={isOwned ? "#08090d" : isAvail ? "#e8eaef" : "#5c6170"}
-                    fontSize="11"
+                    fontSize="18"
                     fontFamily="Oxanium, sans-serif"
                     fontWeight="600"
                     pointerEvents="none"
@@ -374,12 +398,12 @@ export function SkillMap() {
                   </text>
                   <text
                     textAnchor="middle"
-                    y={36}
+                    y={46}
                     fill={selected ? "#e8eaef" : isOwned || isAvail ? "#8b90a0" : "#5c6170"}
-                    fontSize="10"
+                    fontSize="16"
                     fontFamily="Oxanium, sans-serif"
-                    fontWeight="500"
-                    letterSpacing="0.14em"
+                    fontWeight="600"
+                    letterSpacing="0.08em"
                     pointerEvents="none"
                   >
                     {s.short}
@@ -389,36 +413,15 @@ export function SkillMap() {
             })}
           </svg>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2 sm:hidden">
-          {SKILLS.filter((s) => isAvailable(s.id, owned) || (s.id === sel && s.id !== "core")).map((s) => {
-            const selected = sel === s.id;
-            const buyable = isAvailable(s.id, owned) && forge >= s.cost;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                className={cn(
-                  "h-11 min-w-[5.5rem] flex-1 rounded-[12px] border px-3 font-display text-xs font-medium tracking-wide",
-                  selected ? "border-fg bg-elevated text-fg" : "border-border bg-bg/40 text-muted",
-                )}
-                onClick={() => useGame.getState().setSkillId(s.id)}
-              >
-                {s.short}
-                <span className={cn("ml-2 tabular-nums", buyable ? "text-accent" : "text-subtle")}>{s.cost}</span>
-              </button>
-            );
-          })}
-        </div>
-        <footer className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+        <footer className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-sm font-semibold leading-tight">{def.name}</p>
-            <p className="truncate text-xs text-muted">{def.desc}</p>
+            <p className="font-display text-lg font-semibold leading-tight">{def.name}</p>
+            <p className="mt-0.5 text-base leading-snug text-muted sm:truncate sm:text-sm">{def.desc}</p>
           </div>
           <div className="flex w-full shrink-0 flex-row gap-2 sm:w-auto">
             <Button
               variant={bay ? "ghost" : "primary"}
-              size="sm"
-              className="h-11 flex-1 sm:flex-none"
+              className="h-12 flex-1 text-base sm:h-11 sm:flex-none sm:text-sm"
               disabled={!canBuy}
               onClick={() => {
                 api?.buySkill(sel);
@@ -427,7 +430,7 @@ export function SkillMap() {
               {owned.has(sel) ? "Online" : canBuy ? `Forge · ${def.cost}` : def.cost === 0 ? "Core" : "Locked"}
             </Button>
             {bay ? (
-              <Button size="sm" className="h-11 flex-1 sm:flex-none" onClick={() => api?.advanceWave()}>
+              <Button className="h-12 flex-1 text-base sm:h-11 sm:flex-none sm:text-sm" onClick={() => api?.advanceWave()}>
                 <Play className="size-4" />
                 Engage · Wave {briefing.next}
               </Button>
@@ -452,8 +455,8 @@ export function Hud() {
     <div className="pointer-events-none absolute inset-0 z-10 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="rounded-[16px] border border-border bg-bg/55 px-3 py-2 backdrop-blur-sm">
-          <p className="font-display text-[0.65rem] uppercase tracking-[0.2em] text-muted">Score</p>
-          <p className="font-mono text-xl tabular-nums text-fg">{hud.score.toLocaleString()}</p>
+          <p className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-muted">Score</p>
+          <p className="font-mono text-2xl tabular-nums text-fg">{hud.score.toLocaleString()}</p>
           <div className="mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-elevated">
             <div className="h-full bg-danger" style={{ width: `${hpPct}%` }} />
           </div>
@@ -472,7 +475,7 @@ export function Hud() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <p className="rounded-[16px] border border-border bg-bg/55 px-3 py-2 font-mono text-sm tabular-nums text-fg backdrop-blur-sm">
+          <p className="rounded-[16px] border border-border bg-bg/55 px-3 py-2 font-mono text-base tabular-nums text-fg backdrop-blur-sm">
             W{hud.wave}
             {hud.combo > 1 ? <span className="ml-2 text-accent">x{hud.combo}</span> : null}
             {hud.padOn ? (
@@ -642,6 +645,7 @@ function DualSticks() {
     onPointerMove: movePtr,
     onPointerUp: (e: ReactPointerEvent) => release(e.pointerId),
     onPointerCancel: (e: ReactPointerEvent) => release(e.pointerId),
+    onLostPointerCapture: (e: ReactPointerEvent) => release(e.pointerId),
   });
 
   return (

@@ -1,6 +1,9 @@
 const FS_CLASS = "awake-fs";
 
 let wantFs = false;
+let nativeOn = false;
+let nativeSince = 0;
+let exitedAt = 0;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -8,16 +11,23 @@ function notify() {
 }
 
 function hasNativeFs() {
-  return !!(document.fullscreenElement || (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement);
+  const doc = document as Document & { webkitFullscreenElement?: Element | null };
+  return !!(document.fullscreenElement || doc.webkitFullscreenElement);
 }
 
 export function isFullscreen() {
   return wantFs || document.documentElement.classList.contains(FS_CLASS) || hasNativeFs();
 }
 
+export function justExitedFullscreen(ms = 450) {
+  return typeof performance !== "undefined" && performance.now() - exitedAt < ms;
+}
+
 export function subscribeFullscreen(fn: () => void) {
   listeners.add(fn);
-  return () => listeners.delete(fn);
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 function applyClass(on: boolean) {
@@ -25,36 +35,47 @@ function applyClass(on: boolean) {
   document.body?.classList.toggle(FS_CLASS, on);
 }
 
+function markExited() {
+  wantFs = false;
+  nativeOn = false;
+  exitedAt = typeof performance !== "undefined" ? performance.now() : 0;
+  applyClass(false);
+  notify();
+}
+
 export function enterFullscreen() {
   wantFs = true;
   applyClass(true);
   notify();
-  const root =
-    document.querySelector<HTMLElement>("[data-game-root]") ?? document.documentElement;
-  const req =
-    root.requestFullscreen?.bind(root) ||
-    (root as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.bind(root) ||
-    document.documentElement.requestFullscreen?.bind(document.documentElement);
+
+  const el = document.documentElement as HTMLElement & {
+    webkitRequestFullscreen?: () => void;
+    webkitRequestFullScreen?: () => void;
+  };
   try {
-    const p = req?.({ navigationUI: "hide" } as FullscreenOptions);
-    if (p && typeof (p as Promise<void>).catch === "function") {
-      (p as Promise<void>).catch(() => {
-        /* iOS / iframe often rejects; CSS class still applies */
+    if (typeof el.requestFullscreen === "function") {
+      const p = el.requestFullscreen({ navigationUI: "hide" });
+      void p.catch(() => {
+        /* iframe / iOS: keep CSS fallback */
       });
+      return;
     }
+    el.webkitRequestFullscreen?.();
+    el.webkitRequestFullScreen?.();
   } catch {
     /* keep CSS fallback */
   }
 }
 
 export function exitFullscreen() {
-  wantFs = false;
-  applyClass(false);
-  notify();
+  markExited();
+  const doc = document as Document & { webkitExitFullscreen?: () => void; webkitCancelFullScreen?: () => void };
   try {
-    if (document.exitFullscreen) void document.exitFullscreen().catch(() => {});
-    const webkitExit = (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen;
-    webkitExit?.call(document);
+    if (document.exitFullscreen && document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
+    doc.webkitExitFullscreen?.();
+    doc.webkitCancelFullScreen?.();
   } catch {
     /* ignore */
   }
@@ -62,13 +83,30 @@ export function exitFullscreen() {
 
 if (typeof document !== "undefined") {
   const onChange = () => {
-    if (!hasNativeFs() && !wantFs) applyClass(false);
     if (hasNativeFs()) {
+      nativeOn = true;
+      nativeSince = typeof performance !== "undefined" ? performance.now() : 0;
       wantFs = true;
       applyClass(true);
+      notify();
+      return;
+    }
+    // Native FS is off. A bounce/reject must not undo CSS fill.
+    if (nativeOn) {
+      nativeOn = false;
+      const dur = typeof performance !== "undefined" ? performance.now() - nativeSince : 9999;
+      if (wantFs && dur < 400) {
+        applyClass(true);
+        notify();
+        return;
+      }
+      markExited();
+      return;
     }
     notify();
   };
   document.addEventListener("fullscreenchange", onChange);
   document.addEventListener("webkitfullscreenchange", onChange as EventListener);
+  document.addEventListener("fullscreenerror", () => notify());
+  document.addEventListener("webkitfullscreenerror", () => notify());
 }

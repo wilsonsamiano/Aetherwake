@@ -1,4 +1,4 @@
-import { exitFullscreen, isFullscreen } from "@/lib/fullscreen";
+import { exitFullscreen, isFullscreen, justExitedFullscreen } from "@/lib/fullscreen";
 
 export let gameInput: Input | null = null;
 
@@ -358,15 +358,12 @@ export class Input {
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     if (GAME_KEYS.has(e.code)) e.preventDefault();
-    this.keys.add(e.code);
-    if (e.code === "Escape") {
-      if (isFullscreen()) {
-        exitFullscreen();
-        return;
-      }
-      this.pauseQueued = true;
+    if (e.code === "Escape" && (isFullscreen() || justExitedFullscreen())) {
+      if (isFullscreen()) exitFullscreen();
+      return;
     }
-    if (e.code === "KeyP") this.pauseQueued = true;
+    this.keys.add(e.code);
+    if (e.code === "Escape" || e.code === "KeyP") this.pauseQueued = true;
     if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "Space") this.dashQueued = true;
     if (e.code === "Enter") this.confirmQueued = true;
     if (e.code === "Backspace") this.backQueued = true;

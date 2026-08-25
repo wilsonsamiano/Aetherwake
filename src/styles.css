@@ -41,6 +41,7 @@
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
 
   button:not(:disabled),
@@ -55,9 +56,18 @@
 
 /* Fake fullscreen for iOS / restricted iframes */
 html.awake-fs,
-html.awake-fs body {
+html.awake-fs body,
+html.awake-fs #app {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html.awake-fs body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
 }
 
 html.awake-fs [data-game-root] {
@@ -69,12 +79,6 @@ html.awake-fs [data-game-root] {
   max-height: 100dvh;
   z-index: 9999;
   background: var(--color-bg);
-}
-
-/* Title key art is atmosphere only; wordmark is large HTML text */
-img[src="/title.jpg"] {
-  object-fit: cover !important;
-  object-position: center 32% !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
