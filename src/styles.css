@@ -53,6 +53,36 @@
   }
 }
 
+/* Fake fullscreen for iOS / restricted iframes */
+html.awake-fs,
+html.awake-fs body {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.awake-fs [data-game-root] {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  z-index: 9999;
+  background: var(--color-bg);
+}
+
+.title-keyart {
+  object-fit: contain;
+  object-position: center top;
+}
+
+@media (min-aspect-ratio: 1.55/1) and (max-aspect-ratio: 2.15/1) {
+  .title-keyart {
+    object-fit: cover;
+    object-position: center center;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
