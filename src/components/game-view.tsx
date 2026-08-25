@@ -11,6 +11,7 @@ import {
   TitleScreen,
   TouchControls,
 } from "@/components/game-overlays";
+import { FullscreenButtons } from "@/components/fullscreen-ui";
 
 export function GameView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -43,6 +44,10 @@ export function GameView() {
       {phase === "skills" || phase === "forge" ? <SkillMap /> : null}
       {phase === "gameover" ? <GameOver /> : null}
       {phase === "scores" ? <HighScores /> : null}
+      {/* Always-available fullscreen control; CSS fake-FS works on iOS / preview */}
+      <div className="pointer-events-none absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex gap-2 sm:right-5">
+        <FullscreenButtons className="pointer-events-auto" />
+      </div>
     </main>
   );
 }
