@@ -63,7 +63,7 @@ export function TitleScreen() {
   const api = useGame((s) => s.api);
   return (
     <div className="absolute inset-0 z-20 flex min-h-0 flex-col">
-      {/* Art region grows; contain+top keeps full title lockup on tall phones */}
+      {/* Art fills the frame; HTML lockup stays readable on narrow phones */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <img
           src="/title.jpg"
@@ -73,17 +73,23 @@ export function TitleScreen() {
           draggable={false}
           decoding="async"
           fetchPriority="high"
-          className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain object-top sm:object-cover sm:object-[center_center]"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-[center_32%]"
         />
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent sm:via-bg/55"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/55 via-bg/25 to-bg"
           aria-hidden
         />
+        <div className="pointer-events-none absolute inset-x-0 top-[max(1.5rem,env(safe-area-inset-top))] flex flex-col items-center px-4 pt-6 text-center sm:top-[12%] sm:pt-0">
+          <h1 className="font-display text-[clamp(2.5rem,12vw,4.75rem)] font-semibold leading-[0.95] tracking-[0.02em] text-fg drop-shadow-[0_4px_28px_rgba(0,0,0,0.9)]">
+            Aetherwake
+          </h1>
+          <p className="mt-3 max-w-[18rem] font-display text-[clamp(0.8125rem,3.4vw,1.05rem)] leading-snug tracking-[0.08em] text-fg/80 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:max-w-none">
+            Forge the ship. Wake the void.
+          </p>
+        </div>
       </div>
-      <h1 className="sr-only">Aetherwake</h1>
-      <p className="sr-only">Forge the ship. Wake the void.</p>
       <div className="pointer-events-auto relative z-10 mx-auto w-full max-w-[440px] shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:pb-6">
-        <div className="rounded-xl border border-border bg-surface/85 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+        <div className="rounded-xl border border-border bg-surface/90 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
           <div className="flex flex-col gap-3">
             <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
               <Play className="size-4" />
@@ -636,7 +642,6 @@ function DualSticks() {
     onPointerMove: movePtr,
     onPointerUp: (e: ReactPointerEvent) => release(e.pointerId),
     onPointerCancel: (e: ReactPointerEvent) => release(e.pointerId),
-    onLostPointerCapture: (e: ReactPointerEvent) => release(e.pointerId),
   });
 
   return (
