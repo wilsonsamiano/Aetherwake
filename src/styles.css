@@ -71,15 +71,16 @@ html.awake-fs [data-game-root] {
   background: var(--color-bg);
 }
 
-.title-keyart {
-  object-fit: contain;
-  object-position: center top;
+/* Title key art: show full lockup on tall/portrait; cover only on wide landscape */
+img[src="/title.jpg"] {
+  object-fit: contain !important;
+  object-position: center top !important;
 }
 
-@media (min-aspect-ratio: 1.55/1) and (max-aspect-ratio: 2.15/1) {
-  .title-keyart {
-    object-fit: cover;
-    object-position: center center;
+@media (min-aspect-ratio: 1.55/1) {
+  img[src="/title.jpg"] {
+    object-fit: cover !important;
+    object-position: center center !important;
   }
 }
 
