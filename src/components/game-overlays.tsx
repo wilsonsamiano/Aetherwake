@@ -93,6 +93,9 @@ export function TitleScreen() {
       <div className="pointer-events-auto relative z-10 mt-auto mx-auto w-full max-w-[440px] shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:pb-6">
         <div className="rounded-xl border border-border bg-surface/90 p-4 text-fg shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
           <div className="flex flex-col gap-3">
+            <p className="px-1 text-center font-display text-[clamp(1.15rem,5.2vw,1.55rem)] font-semibold leading-snug tracking-[0.08em] text-fg sm:hidden">
+              Forge the ship. Wake the void.
+            </p>
             <Button size="lg" className="w-full" disabled={!api} onClick={() => api?.start()}>
               <Play className="size-4" />
               Engage

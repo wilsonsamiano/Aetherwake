@@ -30,9 +30,60 @@ export function subscribeFullscreen(fn: () => void) {
   };
 }
 
+export function nativeFullscreenAvailable() {
+  if (typeof document === "undefined") return false;
+  const el = document.documentElement as HTMLElement & {
+    requestFullscreen?: () => Promise<void>;
+    webkitRequestFullscreen?: () => void;
+  };
+  return typeof el.requestFullscreen === "function" || typeof el.webkitRequestFullscreen === "function";
+}
+
 function applyClass(on: boolean) {
   document.documentElement.classList.toggle(FS_CLASS, on);
   document.body?.classList.toggle(FS_CLASS, on);
+}
+
+function setViewportVar() {
+  if (typeof window === "undefined") return;
+  const h = window.visualViewport?.height ?? window.innerHeight;
+  document.documentElement.style.setProperty("--aw-vh", `${Math.round(h)}px`);
+}
+
+function onViewportResize() {
+  if (wantFs) setViewportVar();
+}
+
+function bindViewport(on: boolean) {
+  const vv = typeof window !== "undefined" ? window.visualViewport : null;
+  if (!vv) return;
+  vv.removeEventListener("resize", onViewportResize);
+  vv.removeEventListener("scroll", onViewportResize);
+  if (on) {
+    vv.addEventListener("resize", onViewportResize);
+    vv.addEventListener("scroll", onViewportResize);
+    setViewportVar();
+  } else {
+    document.documentElement.style.removeProperty("--aw-vh");
+  }
+}
+
+function hideMobileChrome() {
+  if (typeof window === "undefined") return;
+  setViewportVar();
+  try {
+    const body = document.body;
+    const prev = body.style.height;
+    body.style.height = `${window.innerHeight + 120}px`;
+    window.scrollTo(0, 120);
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      body.style.height = prev;
+      setViewportVar();
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 function markExited() {
@@ -40,31 +91,56 @@ function markExited() {
   nativeOn = false;
   exitedAt = typeof performance !== "undefined" ? performance.now() : 0;
   applyClass(false);
+  bindViewport(false);
   notify();
+}
+
+type FsEl = HTMLElement & {
+  requestFullscreen?: (opts?: FullscreenOptions) => Promise<void>;
+  webkitRequestFullscreen?: () => void;
+  webkitRequestFullScreen?: () => void;
+};
+
+async function requestNativeFs() {
+  const nodes: (Element | null)[] = [
+    document.querySelector("[data-game-root]"),
+    document.documentElement,
+    document.body,
+  ];
+  for (const node of nodes) {
+    if (!node) continue;
+    const el = node as FsEl;
+    if (typeof el.requestFullscreen === "function") {
+      try {
+        await el.requestFullscreen({ navigationUI: "hide" });
+        return true;
+      } catch {
+        try {
+          await el.requestFullscreen();
+          return true;
+        } catch {
+          /* try next */
+        }
+      }
+    }
+    try {
+      el.webkitRequestFullscreen?.();
+      el.webkitRequestFullScreen?.();
+      if (hasNativeFs()) return true;
+    } catch {
+      /* try next */
+    }
+  }
+  return false;
 }
 
 export function enterFullscreen() {
   wantFs = true;
   applyClass(true);
+  bindViewport(true);
+  hideMobileChrome();
   notify();
-
-  const el = document.documentElement as HTMLElement & {
-    webkitRequestFullscreen?: () => void;
-    webkitRequestFullScreen?: () => void;
-  };
-  try {
-    if (typeof el.requestFullscreen === "function") {
-      const p = el.requestFullscreen({ navigationUI: "hide" });
-      void p.catch(() => {
-        /* iframe / iOS: keep CSS fallback */
-      });
-      return;
-    }
-    el.webkitRequestFullscreen?.();
-    el.webkitRequestFullScreen?.();
-  } catch {
-    /* keep CSS fallback */
-  }
+  void requestNativeFs();
 }
 
 export function exitFullscreen() {
@@ -88,15 +164,16 @@ if (typeof document !== "undefined") {
       nativeSince = typeof performance !== "undefined" ? performance.now() : 0;
       wantFs = true;
       applyClass(true);
+      bindViewport(true);
       notify();
       return;
     }
-    // Native FS is off. A bounce/reject must not undo CSS fill.
     if (nativeOn) {
       nativeOn = false;
       const dur = typeof performance !== "undefined" ? performance.now() - nativeSince : 9999;
       if (wantFs && dur < 400) {
         applyClass(true);
+        bindViewport(true);
         notify();
         return;
       }
