@@ -19,6 +19,7 @@ import { gameInput } from "@/game/input";
 import { SKILL_BY_ID, SKILL_EDGES, SKILLS, isAvailable } from "@/game/skills";
 import { useGame } from "@/game/store";
 import { FullscreenButtons } from "@/components/fullscreen-ui";
+import { InstallApp } from "@/components/install-app";
 
 function Panel({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -105,6 +106,7 @@ export function TitleScreen() {
               </Button>
             </div>
             <FullscreenButtons labeled />
+            <InstallApp />
             <CoffeeLink />
           </div>
         </div>
