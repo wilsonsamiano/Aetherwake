@@ -1,0 +1,7 @@
+- Aetherwake GitHub repo: wilsonsamiano/Aetherwake [2026-08-25]
+- Restored fullscreen + portrait title-fit on main (commits Aug 25 2026): fullscreen.ts, fullscreen-ui.tsx, CSS title contain, Esc exits FS [2026-08-25]
+- Title screen: large HTML lockup (clamp 2.5–4.75rem) + tagline; art is cover background only (commit dc75479) [2026-08-25]
+- User prefers published twin-stick baseline over later floating-pad / 3D-enemy experiments [2026-08-25]
+- Share cards previously generated under artifacts/public/og.jpg and x-banner.jpg [2026-08-25]
+- Title art attachment: attachments/Aetherwake.jpg [2026-08-25]
+- Buy Me A Coffee: https://buymeacoffee.com/wilsonsamiano [2026-08-25]
